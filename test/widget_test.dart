@@ -40,7 +40,7 @@ void main() {
     expect(find.text('No tasks yet'), findsOneWidget);
 
     await tester.enterText(
-      find.widgetWithText(TextField, 'New task'),
+      find.widgetWithText(TextField, '新增任务，按 Enter 确认...'),
       'Review desktop build',
     );
     await tester.tap(find.byIcon(Icons.add_rounded));
@@ -73,7 +73,7 @@ void main() {
     expect(find.text('No tasks yet'), findsOneWidget);
   });
 
-  testWidgets('shows today todos by default and can reveal all dates', (
+  testWidgets('shows all dates by default and can filter today todos', (
     WidgetTester tester,
   ) async {
     _setDesktopSize(tester);
@@ -113,13 +113,13 @@ void main() {
     await _pumpUi(tester);
 
     expect(find.text('Today task'), findsAtLeastNWidgets(1));
-    expect(find.text('Yesterday task'), findsNothing);
+    expect(find.text('Yesterday task'), findsAtLeastNWidgets(1));
 
-    await tester.tap(find.byIcon(Icons.event_available_outlined));
+    await tester.tap(find.byIcon(Icons.today_outlined));
     await _pumpUi(tester);
 
     expect(find.text('Today task'), findsAtLeastNWidgets(1));
-    expect(find.text('Yesterday task'), findsAtLeastNWidgets(1));
+    expect(find.text('Yesterday task'), findsNothing);
   });
 
   testWidgets('can move a todo between priority sections', (
@@ -261,7 +261,7 @@ void main() {
     expect(savedSettings.settings.agentCompletionNotificationsEnabled, isFalse);
 
     await tester.enterText(
-      find.widgetWithText(TextField, 'New task'),
+      find.widgetWithText(TextField, '新增任务，按 Enter 确认...'),
       'Silent agent',
     );
     await tester.tap(find.byIcon(Icons.add_rounded));
@@ -291,7 +291,7 @@ void main() {
     await _pumpUi(tester);
 
     await tester.enterText(
-      find.widgetWithText(TextField, 'New task'),
+      find.widgetWithText(TextField, '新增任务，按 Enter 确认...'),
       'Ask agent',
     );
     await tester.tap(find.byIcon(Icons.add_rounded));
@@ -338,7 +338,7 @@ void main() {
     await _pumpUi(tester);
 
     await tester.enterText(
-      find.widgetWithText(TextField, 'New task'),
+      find.widgetWithText(TextField, '新增任务，按 Enter 确认...'),
       'Fix failure',
     );
     await tester.tap(find.byIcon(Icons.add_rounded));

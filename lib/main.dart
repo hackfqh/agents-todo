@@ -18,7 +18,7 @@ const MethodChannel _desktopNotificationsChannel = MethodChannel(
   'todo_desk/notifications',
 );
 
-class TodoApp extends StatelessWidget {
+class TodoApp extends StatefulWidget {
   TodoApp({
     super.key,
     TodoStore? store,
@@ -36,26 +36,223 @@ class TodoApp extends StatelessWidget {
   final IssueFetcher issueFetcher;
   final DesktopNotificationService notificationService;
 
-  ThemeData _lightTheme() {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: Colors.teal,
-      brightness: Brightness.light,
+  @override
+  State<TodoApp> createState() => _TodoAppState();
+}
+
+class _TodoAppState extends State<TodoApp> {
+  ThemeMode _themeMode = ThemeMode.light;
+
+  ThemeData _buildTheme(Brightness brightness) {
+    final isDark = brightness == Brightness.dark;
+    final scheme =
+        ColorScheme.fromSeed(
+          seedColor: const Color(0xFF2563EB),
+          brightness: brightness,
+        ).copyWith(
+          primary: const Color(0xFF2563EB),
+          secondary: isDark ? const Color(0xFFA1A1AA) : const Color(0xFF52525B),
+          surface: isDark ? const Color(0xFF18181B) : const Color(0xFFFAFAFA),
+          surfaceContainerLowest: isDark
+              ? const Color(0xFF09090B)
+              : const Color(0xFFFDFDFD),
+          surfaceContainerLow: isDark
+              ? const Color(0xFF18181B)
+              : const Color(0xFFF8F8F8),
+          surfaceContainer: isDark
+              ? const Color(0xFF1F1F23)
+              : const Color(0xFFF4F4F5),
+          surfaceContainerHigh: isDark
+              ? const Color(0xFF27272A)
+              : const Color(0xFFF4F4F5),
+          surfaceContainerHighest: isDark
+              ? const Color(0xFF27272A)
+              : const Color(0xFFF4F4F5),
+          outline: isDark ? const Color(0xFF3F3F46) : const Color(0xFFD4D4D8),
+          outlineVariant: isDark
+              ? const Color(0xFF27272A)
+              : const Color(0xFFE4E4E7),
+          shadow: Colors.black,
+        );
+
+    final baseTextTheme = ThemeData(brightness: brightness).textTheme.apply(
+      bodyColor: scheme.onSurface,
+      displayColor: scheme.onSurface,
     );
+
     return ThemeData(
-      colorScheme: colorScheme,
+      colorScheme: scheme,
       useMaterial3: true,
-      scaffoldBackgroundColor: const Color(0xFFF5F7F8),
+      brightness: brightness,
+      scaffoldBackgroundColor: scheme.surface,
+      visualDensity: VisualDensity.compact,
+      textTheme: baseTextTheme,
+      dividerTheme: DividerThemeData(
+        color: scheme.outlineVariant,
+        thickness: 1,
+        space: 1,
+      ),
+      scrollbarTheme: ScrollbarThemeData(
+        thickness: const WidgetStatePropertyAll(5),
+        radius: const Radius.circular(99),
+        thumbVisibility: const WidgetStatePropertyAll(true),
+        trackVisibility: const WidgetStatePropertyAll(false),
+        thumbColor: WidgetStateProperty.resolveWith<Color?>((states) {
+          if (states.contains(WidgetState.hovered)) {
+            return scheme.outline;
+          }
+          return scheme.outlineVariant;
+        }),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: scheme.outlineVariant),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: isDark ? scheme.surfaceContainer : scheme.surface,
+        isDense: true,
+        floatingLabelBehavior: FloatingLabelBehavior.never,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: BorderSide(color: scheme.outlineVariant),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: BorderSide(color: scheme.outlineVariant),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: BorderSide(color: scheme.primary),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: BorderSide(color: scheme.error),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: BorderSide(color: scheme.error),
+        ),
+        labelStyle: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+          color: scheme.onSurfaceVariant,
+        ),
+        hintStyle: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+        prefixIconColor: scheme.onSurfaceVariant,
+        suffixIconColor: scheme.onSurfaceVariant,
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          visualDensity: VisualDensity.compact,
+          minimumSize: const WidgetStatePropertyAll(Size(0, 30)),
+          padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          ),
+          textStyle: WidgetStatePropertyAll(
+            TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+          ),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: scheme.surfaceContainer,
+        labelStyle: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w500,
+          color: scheme.onSurfaceVariant,
+        ),
+        side: BorderSide(color: scheme.outlineVariant),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          minimumSize: const Size(0, 28),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.compact,
+          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          minimumSize: const Size(0, 28),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.compact,
+          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+          side: BorderSide(color: scheme.outlineVariant),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          minimumSize: const Size(0, 28),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.compact,
+          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: ButtonStyle(
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          padding: const WidgetStatePropertyAll(EdgeInsets.all(5)),
+          minimumSize: const WidgetStatePropertyAll(Size(24, 24)),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+          ),
+        ),
+      ),
+      checkboxTheme: CheckboxThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
+        side: BorderSide(color: scheme.outline, width: 1.2),
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+      ),
+      switchTheme: SwitchThemeData(
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        thumbIcon: WidgetStateProperty.resolveWith<Icon?>((states) {
+          return null;
+        }),
+      ),
+      tooltipTheme: TooltipThemeData(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        margin: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: scheme.onSurface,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        textStyle: TextStyle(fontSize: 10, color: scheme.surface),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
     );
   }
 
-  ThemeData _darkTheme() {
-    return ThemeData(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: Colors.teal,
-        brightness: Brightness.dark,
-      ),
-      useMaterial3: true,
-    );
+  void _toggleTheme() {
+    setState(() {
+      _themeMode = _themeMode == ThemeMode.dark
+          ? ThemeMode.light
+          : ThemeMode.dark;
+    });
   }
 
   @override
@@ -63,14 +260,15 @@ class TodoApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Todo Desk',
-      theme: _lightTheme(),
-      darkTheme: _darkTheme(),
-      themeMode: ThemeMode.system,
+      theme: _buildTheme(Brightness.light),
+      darkTheme: _buildTheme(Brightness.dark),
+      themeMode: _themeMode,
       home: TodoHomePage(
-        store: store,
-        agentRunner: agentRunner,
-        issueFetcher: issueFetcher,
-        notificationService: notificationService,
+        store: widget.store,
+        agentRunner: widget.agentRunner,
+        issueFetcher: widget.issueFetcher,
+        notificationService: widget.notificationService,
+        onThemeToggle: _toggleTheme,
       ),
     );
   }
@@ -111,7 +309,7 @@ extension TodoPriorityDetails on TodoPriority {
     return switch (this) {
       TodoPriority.high => colorScheme.error,
       TodoPriority.medium => Colors.amber.shade800,
-      TodoPriority.low => colorScheme.primary,
+      TodoPriority.low => Colors.green.shade600,
     };
   }
 
@@ -928,12 +1126,14 @@ class TodoHomePage extends StatefulWidget {
     required this.agentRunner,
     required this.issueFetcher,
     required this.notificationService,
+    required this.onThemeToggle,
   });
 
   final TodoStore store;
   final AgentTaskRunner agentRunner;
   final IssueFetcher issueFetcher;
   final DesktopNotificationService notificationService;
+  final VoidCallback onThemeToggle;
 
   @override
   State<TodoHomePage> createState() => _TodoHomePageState();
@@ -943,11 +1143,15 @@ class _TodoHomePageState extends State<TodoHomePage> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _inputFocusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
+  final ScrollController _sidebarScrollController = ScrollController();
+  final ScrollController _agentScrollController = ScrollController();
+  double _agentPanelWidth = 320;
+  TodoPriority _quickAddPriority = TodoPriority.medium;
 
   List<TodoProject> _projects = <TodoProject>[];
   String? _selectedProjectId;
   TodoFilter _filter = TodoFilter.all;
-  DateFilterMode _dateFilterMode = DateFilterMode.today;
+  DateFilterMode _dateFilterMode = DateFilterMode.all;
   DateTime _selectedDate = _today();
   DateTime _rangeStart = _today();
   DateTime _rangeEnd = _today();
@@ -969,6 +1173,8 @@ class _TodoHomePageState extends State<TodoHomePage> {
     _controller.dispose();
     _inputFocusNode.dispose();
     _scrollController.dispose();
+    _sidebarScrollController.dispose();
+    _agentScrollController.dispose();
     super.dispose();
   }
 
@@ -984,7 +1190,6 @@ class _TodoHomePageState extends State<TodoHomePage> {
         _selectedProjectId = project.id;
         _settings = data.settings;
         _selectedTodoId = null;
-        _selectFirstVisibleTodoIfNeeded();
         _isLoading = false;
         _notice = null;
       });
@@ -1030,19 +1235,25 @@ class _TodoHomePageState extends State<TodoHomePage> {
       return;
     }
 
-    _insertTodo(_createTodo(title: title, details: ''));
+    _insertTodo(
+      _createTodo(title: title, details: '', priority: _quickAddPriority),
+    );
     _controller.clear();
     _inputFocusNode.requestFocus();
   }
 
-  TodoItem _createTodo({required String title, required String details}) {
+  TodoItem _createTodo({
+    required String title,
+    required String details,
+    TodoPriority priority = TodoPriority.medium,
+  }) {
     final now = DateTime.now();
     return TodoItem(
       id: now.microsecondsSinceEpoch.toString(),
       title: title,
       details: details,
       createdAt: now,
-      priority: TodoPriority.medium,
+      priority: priority,
       completed: false,
       conversations: {},
     );
@@ -1053,7 +1264,7 @@ class _TodoHomePageState extends State<TodoHomePage> {
       _replaceSelectedProjectTodos(<TodoItem>[todo, ..._todos]);
       _selectedTodoId = todo.id;
       _filter = TodoFilter.all;
-      _dateFilterMode = DateFilterMode.today;
+      _dateFilterMode = DateFilterMode.all;
       _notice = null;
     });
 
@@ -1115,11 +1326,10 @@ class _TodoHomePageState extends State<TodoHomePage> {
       _selectedProjectId = project.id;
       _selectedTodoId = null;
       _filter = TodoFilter.all;
-      _dateFilterMode = DateFilterMode.today;
+      _dateFilterMode = DateFilterMode.all;
       _selectedDate = _today();
       _rangeStart = _today();
       _rangeEnd = _today();
-      _selectFirstVisibleTodoIfNeeded();
       _notice = null;
     });
 
@@ -1158,7 +1368,7 @@ class _TodoHomePageState extends State<TodoHomePage> {
             )
             .toList(),
       );
-      _selectFirstVisibleTodoIfNeeded();
+      _clearSelectionIfHidden();
     });
 
     unawaited(_persistTodos());
@@ -1185,7 +1395,30 @@ class _TodoHomePageState extends State<TodoHomePage> {
     setState(() {
       final updatedTodos = _todos.where((item) => item.id != todo.id).toList();
       _replaceSelectedProjectTodos(updatedTodos);
-      _selectFirstVisibleTodoIfNeeded();
+      _clearSelectionIfHidden();
+    });
+
+    unawaited(_persistTodos());
+  }
+
+  void _clearSelectedAgentHistory() {
+    final selectedTodo = _selectedTodo;
+    if (selectedTodo == null) {
+      return;
+    }
+
+    setState(() {
+      _replaceSelectedProjectTodos(
+        _todos.map((item) {
+          if (item.id != selectedTodo.id) {
+            return item;
+          }
+          final conversations = {...item.conversations};
+          conversations.remove(_selectedAgent);
+          return item.copyWith(conversations: conversations);
+        }).toList(),
+      );
+      _notice = null;
     });
 
     unawaited(_persistTodos());
@@ -1197,11 +1430,9 @@ class _TodoHomePageState extends State<TodoHomePage> {
     }
 
     setState(() {
-      final updatedTodos = _todos
-          .where((item) => !(item.completed && _matchesDateFilter(item)))
-          .toList();
+      final updatedTodos = _todos.where((item) => !item.completed).toList();
       _replaceSelectedProjectTodos(updatedTodos);
-      _selectFirstVisibleTodoIfNeeded();
+      _clearSelectionIfHidden();
     });
 
     unawaited(_persistTodos());
@@ -1213,7 +1444,7 @@ class _TodoHomePageState extends State<TodoHomePage> {
       if (mode == DateFilterMode.today) {
         _selectedDate = _today();
       }
-      _selectFirstVisibleTodoIfNeeded();
+      _clearSelectionIfHidden();
     });
   }
 
@@ -1266,7 +1497,7 @@ class _TodoHomePageState extends State<TodoHomePage> {
     setState(() {
       _dateFilterMode = DateFilterMode.day;
       _selectedDate = _dateOnly(picked);
-      _selectFirstVisibleTodoIfNeeded();
+      _clearSelectionIfHidden();
     });
   }
 
@@ -1285,11 +1516,15 @@ class _TodoHomePageState extends State<TodoHomePage> {
       _dateFilterMode = DateFilterMode.range;
       _rangeStart = _dateOnly(picked.start);
       _rangeEnd = _dateOnly(picked.end);
-      _selectFirstVisibleTodoIfNeeded();
+      _clearSelectionIfHidden();
     });
   }
 
-  Future<void> _sendToAgent(TodoItem todo, String instruction) async {
+  Future<void> _sendToAgent(
+    TodoItem todo,
+    String instruction, {
+    bool continueSession = true,
+  }) async {
     if (_runningAgent != null) {
       return;
     }
@@ -1321,7 +1556,7 @@ class _TodoHomePageState extends State<TodoHomePage> {
         title: todo.title,
         details: todo.details,
         instruction: instruction,
-        conversation: todo.conversations[agent],
+        conversation: continueSession ? todo.conversations[agent] : null,
         workingDirectory: workingDirectory,
         projectName: project.name,
         projectPath: project.folderPath,
@@ -1361,12 +1596,17 @@ class _TodoHomePageState extends State<TodoHomePage> {
             return item;
           }
           final existing = item.conversations[agent];
-          final sessionId = result.sessionId ?? existing?.sessionId ?? '';
+          final sessionId =
+              result.sessionId ??
+              (continueSession ? existing?.sessionId : null) ??
+              '';
           final updatedConversation = AgentConversation(
             agent: agent,
             sessionId: sessionId,
             updatedAt: finishedAt,
-            runs: <AgentRun>[run, ...?existing?.runs],
+            runs: continueSession
+                ? <AgentRun>[run, ...?existing?.runs]
+                : <AgentRun>[run],
           );
           return item.copyWith(
             conversations: {...item.conversations, agent: updatedConversation},
@@ -1481,19 +1721,6 @@ class _TodoHomePageState extends State<TodoHomePage> {
   int get _completedCount =>
       _dateFilteredTodos.where((item) => item.completed).length;
 
-  String get _dateFilterLabel {
-    switch (_dateFilterMode) {
-      case DateFilterMode.today:
-        return 'Today';
-      case DateFilterMode.day:
-        return _formatDate(_selectedDate);
-      case DateFilterMode.range:
-        return '${_formatDate(_rangeStart)} to ${_formatDate(_rangeEnd)}';
-      case DateFilterMode.all:
-        return 'All dates';
-    }
-  }
-
   List<TodoItem> get _todos => _selectedProject?.todos ?? const <TodoItem>[];
 
   TodoProject? get _selectedProject {
@@ -1517,14 +1744,15 @@ class _TodoHomePageState extends State<TodoHomePage> {
     return null;
   }
 
-  void _selectFirstVisibleTodoIfNeeded() {
+  void _clearSelectionIfHidden() {
     final selectedTodoId = _selectedTodoId;
-    final visibleTodos = _visibleTodos;
-    if (selectedTodoId != null &&
-        visibleTodos.any((item) => item.id == selectedTodoId)) {
+    if (selectedTodoId == null) {
       return;
     }
-    _selectedTodoId = visibleTodos.isEmpty ? null : visibleTodos.first.id;
+    if (_visibleTodos.any((item) => item.id == selectedTodoId)) {
+      return;
+    }
+    _selectedTodoId = null;
   }
 
   void _replaceSelectedProjectTodos(List<TodoItem> todos) {
@@ -1543,215 +1771,95 @@ class _TodoHomePageState extends State<TodoHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final visibleTodos = _visibleTodos;
     final selectedTodo = _selectedTodo;
     final selectedProject = _selectedProject;
+    final notice = _notice;
+    final totalOpen = _openCount;
+    final totalDone = _completedCount;
 
     return Scaffold(
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1180),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Todo Desk',
-                                  style: theme.textTheme.headlineMedium
-                                      ?.copyWith(fontWeight: FontWeight.w700),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  '${selectedProject?.name ?? 'No project'} · $_dateFilterLabel · $_openCount open · $_completedCount done',
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Wrap(
-                            spacing: 8,
-                            children: [
-                              IconButton.outlined(
-                                tooltip: 'Import issue',
-                                onPressed: _isLoading || selectedProject == null
-                                    ? null
-                                    : _openIssueImporter,
-                                icon: const Icon(Icons.add_link_outlined),
-                              ),
-                              IconButton.outlined(
-                                tooltip: 'Settings',
-                                onPressed: _isLoading ? null : _openSettings,
-                                icon: const Icon(Icons.settings_outlined),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      if (_notice != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 12),
-                          child: Align(
-                            alignment: Alignment.centerRight,
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 360),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: colorScheme.errorContainer,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  _notice!,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: colorScheme.onErrorContainer,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  _ProjectBar(
-                    projects: _projects,
-                    selectedProject: selectedProject,
-                    isLoading: _isLoading,
-                    onProjectSelected: _selectProject,
-                    onAddProject: _addProject,
-                    onEditProject: selectedProject == null
-                        ? null
-                        : () => _editProject(selectedProject),
-                  ),
-                  const SizedBox(height: 16),
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final isCompact = constraints.maxWidth < 620;
-                      final textField = TextField(
-                        controller: _controller,
-                        focusNode: _inputFocusNode,
-                        enabled: !_isLoading && selectedProject != null,
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: (_) => _addTodo(),
-                        decoration: const InputDecoration(
-                          labelText: 'New task',
-                          prefixIcon: Icon(Icons.edit_note_outlined),
-                          border: OutlineInputBorder(),
-                        ),
-                      );
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 1080;
+            final agentPanelWidth = isCompact
+                ? constraints.maxWidth
+                : _agentPanelWidth.clamp(260.0, 520.0).toDouble();
 
-                      final addButton = FilledButton.icon(
-                        onPressed: _isLoading || selectedProject == null
+            return Column(
+              children: [
+                _TitleBar(
+                  projectName: selectedProject?.name,
+                  openCount: totalOpen,
+                  doneCount: totalDone,
+                  themeMode: Theme.of(context).brightness,
+                  onToggleTheme: widget.onThemeToggle,
+                  onOpenSettings: _isLoading ? null : _openSettings,
+                  onOpenIssue: _isLoading || selectedProject == null
+                      ? null
+                      : _openIssueImporter,
+                ),
+                Expanded(
+                  child: Row(
+                    children: [
+                      _Sidebar(
+                        scrollController: _sidebarScrollController,
+                        projects: _projects,
+                        selectedProject: selectedProject,
+                        isLoading: _isLoading,
+                        notice: notice,
+                        onProjectSelected: _selectProject,
+                        onAddProject: _addProject,
+                        onEditProject: selectedProject == null
                             ? null
-                            : _addTodo,
-                        icon: const Icon(Icons.add_rounded),
-                        label: const Text('Add'),
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size(120, 56),
-                        ),
-                      );
-
-                      if (isCompact) {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            textField,
-                            const SizedBox(height: 12),
-                            addButton,
-                          ],
-                        );
-                      }
-
-                      return Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(child: textField),
-                          const SizedBox(width: 12),
-                          addButton,
-                        ],
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  Wrap(
-                    alignment: WrapAlignment.spaceBetween,
-                    runSpacing: 12,
-                    spacing: 12,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      _DateFilterControl(
-                        mode: _dateFilterMode,
-                        selectedDate: _selectedDate,
-                        rangeStart: _rangeStart,
-                        rangeEnd: _rangeEnd,
-                        onModeChanged: _setDateFilterMode,
-                        onPickSingleDate: _pickSingleDate,
-                        onPickDateRange: _pickDateRange,
-                      ),
-                      SegmentedButton<TodoFilter>(
-                        segments: const [
-                          ButtonSegment<TodoFilter>(
-                            value: TodoFilter.all,
-                            label: Text('All'),
-                            icon: Icon(Icons.list_alt_outlined),
-                          ),
-                          ButtonSegment<TodoFilter>(
-                            value: TodoFilter.active,
-                            label: Text('Open'),
-                            icon: Icon(Icons.radio_button_unchecked_outlined),
-                          ),
-                          ButtonSegment<TodoFilter>(
-                            value: TodoFilter.completed,
-                            label: Text('Done'),
-                            icon: Icon(Icons.check_circle_outline),
-                          ),
-                        ],
-                        selected: <TodoFilter>{_filter},
-                        onSelectionChanged: (selection) {
+                            : _editProject,
+                        onShowAll: () {
                           setState(() {
-                            _filter = selection.first;
-                            _selectFirstVisibleTodoIfNeeded();
+                            _dateFilterMode = DateFilterMode.all;
+                            _filter = TodoFilter.all;
+                            _clearSelectionIfHidden();
                           });
                         },
+                        onShowToday: () {
+                          setState(() {
+                            _dateFilterMode = DateFilterMode.today;
+                            _selectedDate = _today();
+                            _clearSelectionIfHidden();
+                          });
+                        },
+                        onClearCompleted: _clearCompleted,
                       ),
-                      if (_completedCount > 0)
-                        TextButton.icon(
-                          onPressed: _clearCompleted,
-                          icon: const Icon(Icons.delete_sweep_outlined),
-                          label: const Text('Clear completed'),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final todoList = _TodoListPanel(
+                      Expanded(
+                        child: _MainWorkspace(
+                          project: selectedProject,
                           isLoading: _isLoading,
+                          dateFilterMode: _dateFilterMode,
+                          selectedDate: _selectedDate,
+                          rangeStart: _rangeStart,
+                          rangeEnd: _rangeEnd,
+                          filter: _filter,
                           visibleTodos: visibleTodos,
                           selectedTodoId: _selectedTodoId,
-                          filter: _filter,
-                          dateLabel: _dateFilterLabel,
                           scrollController: _scrollController,
+                          onAddTodo: _addTodo,
+                          addController: _controller,
+                          addFocusNode: _inputFocusNode,
+                          selectedPriority: _quickAddPriority,
+                          onQuickAddPriorityChanged: (priority) {
+                            setState(() {
+                              _quickAddPriority = priority;
+                            });
+                          },
+                          onFilterChanged: (filter) {
+                            setState(() {
+                              _filter = filter;
+                              _clearSelectionIfHidden();
+                            });
+                          },
+                          onDateModeChanged: _setDateFilterMode,
+                          onPickSingleDate: _pickSingleDate,
+                          onPickDateRange: _pickDateRange,
                           onSelectTodo: (todo) {
                             setState(() {
                               _selectedTodoId = todo.id;
@@ -1761,159 +1869,85 @@ class _TodoHomePageState extends State<TodoHomePage> {
                           onPriorityChanged: _changeTodoPriority,
                           onEditTodo: _editTodo,
                           onDeleteTodo: _deleteTodo,
-                        );
-                        final agentPanel = _AgentPanel(
-                          todo: selectedTodo,
-                          selectedAgent: _selectedAgent,
-                          runningAgent: _runningAgent,
-                          onAgentChanged: (agent) {
+                        ),
+                      ),
+                      if (!isCompact) ...[
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onHorizontalDragUpdate: (details) {
                             setState(() {
-                              _selectedAgent = agent;
+                              _agentPanelWidth =
+                                  (_agentPanelWidth - details.delta.dx)
+                                      .clamp(260.0, 520.0)
+                                      .toDouble();
                             });
                           },
-                          onRun: selectedTodo == null
-                              ? null
-                              : (instruction) =>
-                                    _sendToAgent(selectedTodo, instruction),
-                        );
-
-                        if (constraints.maxWidth < 900) {
-                          return Column(
-                            children: [
-                              Expanded(flex: 5, child: todoList),
-                              const SizedBox(height: 16),
-                              Expanded(flex: 4, child: agentPanel),
-                            ],
-                          );
-                        }
-
-                        return Row(
-                          children: [
-                            Expanded(flex: 6, child: todoList),
-                            const SizedBox(width: 16),
-                            Expanded(flex: 5, child: agentPanel),
-                          ],
-                        );
+                          child: MouseRegion(
+                            cursor: SystemMouseCursors.resizeLeftRight,
+                            child: Container(
+                              width: 4,
+                              color: Colors.transparent,
+                              child: const SizedBox.expand(),
+                            ),
+                          ),
+                        ),
+                        SizedBox(
+                          width: agentPanelWidth,
+                          child: _AgentWorkspace(
+                            scrollController: _agentScrollController,
+                            todo: selectedTodo,
+                            selectedAgent: _selectedAgent,
+                            runningAgent: _runningAgent,
+                            onAgentChanged: (agent) {
+                              setState(() {
+                                _selectedAgent = agent;
+                              });
+                            },
+                            onRun: selectedTodo == null
+                                ? null
+                                : (instruction, {continueSession = true}) =>
+                                      _sendToAgent(
+                                        selectedTodo,
+                                        instruction,
+                                        continueSession: continueSession,
+                                      ),
+                            onStop: () {},
+                            onClearHistory: selectedTodo == null
+                                ? null
+                                : _clearSelectedAgentHistory,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (isCompact)
+                  SizedBox(
+                    height: 380,
+                    child: _AgentWorkspace(
+                      scrollController: _agentScrollController,
+                      todo: selectedTodo,
+                      selectedAgent: _selectedAgent,
+                      runningAgent: _runningAgent,
+                      onAgentChanged: (agent) {
+                        setState(() {
+                          _selectedAgent = agent;
+                        });
                       },
+                      onRun: selectedTodo == null
+                          ? null
+                          : (instruction, {continueSession = true}) =>
+                                _sendToAgent(
+                                  selectedTodo,
+                                  instruction,
+                                  continueSession: continueSession,
+                                ),
+                      onStop: () {},
+                      onClearHistory: selectedTodo == null
+                          ? null
+                          : _clearSelectedAgentHistory,
                     ),
                   ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ProjectBar extends StatelessWidget {
-  const _ProjectBar({
-    required this.projects,
-    required this.selectedProject,
-    required this.isLoading,
-    required this.onProjectSelected,
-    required this.onAddProject,
-    required this.onEditProject,
-  });
-
-  final List<TodoProject> projects;
-  final TodoProject? selectedProject;
-  final bool isLoading;
-  final ValueChanged<String> onProjectSelected;
-  final VoidCallback onAddProject;
-  final VoidCallback? onEditProject;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final projectPicker = DropdownButtonFormField<String>(
-              initialValue: selectedProject?.id,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Project',
-                prefixIcon: Icon(Icons.folder_outlined),
-                border: OutlineInputBorder(),
-              ),
-              items: projects.map((project) {
-                return DropdownMenuItem<String>(
-                  value: project.id,
-                  child: Text(project.name, overflow: TextOverflow.ellipsis),
-                );
-              }).toList(),
-              onChanged: isLoading
-                  ? null
-                  : (value) {
-                      if (value != null) {
-                        onProjectSelected(value);
-                      }
-                    },
-            );
-
-            final actions = Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: isLoading ? null : onAddProject,
-                  icon: const Icon(Icons.create_new_folder_outlined),
-                  label: const Text('Add project'),
-                ),
-                IconButton.outlined(
-                  tooltip: 'Edit project',
-                  onPressed: isLoading ? null : onEditProject,
-                  icon: const Icon(Icons.drive_file_rename_outline),
-                ),
-              ],
-            );
-
-            final path = selectedProject?.folderPath ?? '';
-            final details = Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: SelectableText(
-                path.isEmpty ? 'No project folder selected.' : path,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            );
-
-            if (constraints.maxWidth < 720) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  projectPicker,
-                  const SizedBox(height: 10),
-                  actions,
-                  details,
-                ],
-              );
-            }
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: projectPicker),
-                    const SizedBox(width: 12),
-                    actions,
-                  ],
-                ),
-                details,
               ],
             );
           },
@@ -1945,35 +1979,35 @@ class _DateFilterControl extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: 6,
+      runSpacing: 6,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        SegmentedButton<DateFilterMode>(
-          segments: const [
-            ButtonSegment<DateFilterMode>(
-              value: DateFilterMode.today,
-              label: Text('Today'),
-              icon: Icon(Icons.today_outlined),
-            ),
-            ButtonSegment<DateFilterMode>(
-              value: DateFilterMode.day,
-              label: Text('Date'),
-              icon: Icon(Icons.calendar_month_outlined),
-            ),
-            ButtonSegment<DateFilterMode>(
-              value: DateFilterMode.range,
-              label: Text('Range'),
-              icon: Icon(Icons.date_range_outlined),
-            ),
-            ButtonSegment<DateFilterMode>(
+        _MiniSegmentedButton<DateFilterMode>(
+          selectedValue: mode,
+          onChanged: onModeChanged,
+          items: const [
+            _MiniSegmentItem<DateFilterMode>(
               value: DateFilterMode.all,
-              label: Text('All'),
-              icon: Icon(Icons.event_available_outlined),
+              label: '全部',
+              icon: Icons.event_available_outlined,
+            ),
+            _MiniSegmentItem<DateFilterMode>(
+              value: DateFilterMode.today,
+              label: '今天',
+              icon: Icons.today_outlined,
+            ),
+            _MiniSegmentItem<DateFilterMode>(
+              value: DateFilterMode.day,
+              label: '指定日期',
+              icon: Icons.calendar_month_outlined,
+            ),
+            _MiniSegmentItem<DateFilterMode>(
+              value: DateFilterMode.range,
+              label: '日期范围',
+              icon: Icons.date_range_outlined,
             ),
           ],
-          selected: <DateFilterMode>{mode},
-          onSelectionChanged: (selection) => onModeChanged(selection.first),
         ),
         if (mode == DateFilterMode.day)
           OutlinedButton.icon(
@@ -1990,78 +2024,6 @@ class _DateFilterControl extends StatelessWidget {
             ),
           ),
       ],
-    );
-  }
-}
-
-class _TodoListPanel extends StatelessWidget {
-  const _TodoListPanel({
-    required this.isLoading,
-    required this.visibleTodos,
-    required this.selectedTodoId,
-    required this.filter,
-    required this.dateLabel,
-    required this.scrollController,
-    required this.onSelectTodo,
-    required this.onToggleTodo,
-    required this.onPriorityChanged,
-    required this.onEditTodo,
-    required this.onDeleteTodo,
-  });
-
-  final bool isLoading;
-  final List<TodoItem> visibleTodos;
-  final String? selectedTodoId;
-  final TodoFilter filter;
-  final String dateLabel;
-  final ScrollController scrollController;
-  final ValueChanged<TodoItem> onSelectTodo;
-  final void Function(TodoItem todo, bool? completed) onToggleTodo;
-  final void Function(TodoItem todo, TodoPriority priority) onPriorityChanged;
-  final ValueChanged<TodoItem> onEditTodo;
-  final ValueChanged<TodoItem> onDeleteTodo;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : visibleTodos.isEmpty
-          ? _EmptyState(filter: filter, dateLabel: dateLabel)
-          : Scrollbar(
-              controller: scrollController,
-              thumbVisibility: true,
-              child: ListView(
-                controller: scrollController,
-                padding: const EdgeInsets.all(10),
-                children: TodoPriority.values.map((priority) {
-                  final priorityTodos = visibleTodos
-                      .where((todo) => todo.priority == priority)
-                      .toList();
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _TodoPrioritySection(
-                      priority: priority,
-                      todos: priorityTodos,
-                      selectedTodoId: selectedTodoId,
-                      onSelectTodo: onSelectTodo,
-                      onToggleTodo: onToggleTodo,
-                      onPriorityChanged: onPriorityChanged,
-                      onEditTodo: onEditTodo,
-                      onDeleteTodo: onDeleteTodo,
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
     );
   }
 }
@@ -2105,85 +2067,76 @@ class _TodoPrioritySection extends StatelessWidget {
         return AnimatedContainer(
           duration: const Duration(milliseconds: 140),
           curve: Curves.easeOut,
-          padding: const EdgeInsets.all(10),
+          padding: EdgeInsets.zero,
           decoration: BoxDecoration(
             color: isTargeted
-                ? priorityColor.withValues(alpha: 0.10)
-                : colorScheme.surfaceContainerHighest.withValues(alpha: 0.26),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: isTargeted
-                  ? priorityColor
-                  : colorScheme.outlineVariant.withValues(alpha: 0.76),
+                ? priorityColor.withValues(alpha: 0.08)
+                : colorScheme.surface,
+            border: Border(
+              bottom: BorderSide(color: colorScheme.outlineVariant),
             ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 30,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      color: priorityColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(priority.icon, size: 18, color: priorityColor),
+              Container(
+                padding: const EdgeInsets.fromLTRB(12, 5, 12, 2),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerLowest,
+                  border: Border(
+                    bottom: BorderSide(color: colorScheme.outlineVariant),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      '${priority.label} priority',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    todos.length.toString(),
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              if (todos.isEmpty)
-                Container(
-                  constraints: const BoxConstraints(minHeight: 54),
-                  alignment: Alignment.centerLeft,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surface.withValues(alpha: 0.64),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: colorScheme.outlineVariant.withValues(alpha: 0.55),
-                    ),
-                  ),
-                  child: Text(
-                    'No ${priority.label.toLowerCase()} priority tasks',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                )
-              else
-                Column(
-                  children: todos.asMap().entries.map((entry) {
-                    return Padding(
-                      padding: EdgeInsets.only(top: entry.key == 0 ? 0 : 8),
-                      child: _TodoTile(
-                        todo: entry.value,
-                        isSelected: entry.value.id == selectedTodoId,
-                        onSelectTodo: onSelectTodo,
-                        onToggleTodo: onToggleTodo,
-                        onEditTodo: onEditTodo,
-                        onDeleteTodo: onDeleteTodo,
-                      ),
-                    );
-                  }).toList(),
                 ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: priorityColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '${priority.label} priority',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 10,
+                          letterSpacing: 0.6,
+                          color: colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.72,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '(${todos.length})',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontSize: 10,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                children: todos.map((todo) {
+                  return _TodoTile(
+                    todo: todo,
+                    isSelected: todo.id == selectedTodoId,
+                    onSelectTodo: onSelectTodo,
+                    onToggleTodo: onToggleTodo,
+                    onEditTodo: onEditTodo,
+                    onDeleteTodo: onDeleteTodo,
+                  );
+                }).toList(),
+              ),
             ],
           ),
         );
@@ -2192,7 +2145,7 @@ class _TodoPrioritySection extends StatelessWidget {
   }
 }
 
-class _TodoTile extends StatelessWidget {
+class _TodoTile extends StatefulWidget {
   const _TodoTile({
     required this.todo,
     required this.isSelected,
@@ -2210,114 +2163,187 @@ class _TodoTile extends StatelessWidget {
   final ValueChanged<TodoItem> onDeleteTodo;
 
   @override
+  State<_TodoTile> createState() => _TodoTileState();
+}
+
+class _TodoTileState extends State<_TodoTile> {
+  bool _isHovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isCompleted = todo.completed;
-    final agentCount = todo.conversations.length;
+    final isCompleted = widget.todo.completed;
+    final priorityColor = widget.todo.priority.color(colorScheme);
+    final isDark = theme.brightness == Brightness.dark;
+    final showInlineTools = _isHovered || widget.isSelected;
 
-    return Material(
-      color: isSelected
-          ? colorScheme.secondaryContainer.withValues(alpha: 0.55)
-          : colorScheme.surface,
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: () => onSelectTodo(todo),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          child: Row(
-            children: [
-              Draggable<TodoItem>(
-                data: todo,
-                dragAnchorStrategy: pointerDragAnchorStrategy,
-                feedback: _TodoDragPreview(todo: todo),
-                childWhenDragging: Opacity(
-                  opacity: 0.35,
-                  child: _DragHandle(color: colorScheme.onSurfaceVariant),
-                ),
-                child: _DragHandle(color: colorScheme.onSurfaceVariant),
+    return MouseRegion(
+      onEnter: (_) {
+        setState(() {
+          _isHovered = true;
+        });
+      },
+      onExit: (_) {
+        setState(() {
+          _isHovered = false;
+        });
+      },
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: widget.isSelected
+              ? colorScheme.primaryContainer.withValues(alpha: 0.28)
+              : colorScheme.surface,
+          border: Border(
+            left: BorderSide(
+              color: widget.isSelected
+                  ? colorScheme.primary
+                  : Colors.transparent,
+              width: 2,
+            ),
+            bottom: BorderSide(color: colorScheme.outlineVariant),
+          ),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => widget.onSelectTodo(widget.todo),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                widget.isSelected ? 10 : 12,
+                8,
+                12,
+                8,
               ),
-              const SizedBox(width: 2),
-              Checkbox(
-                value: isCompleted,
-                onChanged: (value) => onToggleTodo(todo, value),
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 8,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        todo.title,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          decoration: isCompleted
-                              ? TextDecoration.lineThrough
-                              : TextDecoration.none,
-                          color: isCompleted
-                              ? colorScheme.onSurfaceVariant
-                              : colorScheme.onSurface,
-                        ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Draggable<TodoItem>(
+                    data: widget.todo,
+                    dragAnchorStrategy: pointerDragAnchorStrategy,
+                    feedback: _TodoDragPreview(todo: widget.todo),
+                    childWhenDragging: Opacity(
+                      opacity: 0.35,
+                      child: _DragHandle(
+                        color: colorScheme.onSurfaceVariant,
+                        visible: true,
                       ),
-                      if (todo.details.trim().isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          todo.details.trim(),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
+                    ),
+                    child: _DragHandle(
+                      color: colorScheme.onSurfaceVariant,
+                      visible: showInlineTools,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Checkbox(
+                    value: isCompleted,
+                    onChanged: (value) =>
+                        widget.onToggleTodo(widget.todo, value),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 1),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.todo.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              decoration: isCompleted
+                                  ? TextDecoration.lineThrough
+                                  : TextDecoration.none,
+                              color: isCompleted
+                                  ? colorScheme.onSurfaceVariant
+                                  : colorScheme.onSurface,
+                            ),
                           ),
-                        ),
-                      ],
-                      const SizedBox(height: 5),
-                      Text(
-                        'Added ${_formatDate(todo.createdAt)}',
-                        style: theme.textTheme.bodySmall?.copyWith(
+                          if (widget.todo.details.trim().isNotEmpty) ...[
+                            const SizedBox(height: 1),
+                            Text(
+                              widget.todo.details.trim(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 5,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                _formatDate(widget.todo.createdAt),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant
+                                      .withValues(alpha: 0.78),
+                                  fontSize: 10,
+                                ),
+                              ),
+                              _InlineChip(
+                                label: widget.todo.priority.label,
+                                backgroundColor: priorityColor.withValues(
+                                  alpha: isDark ? 0.18 : 0.09,
+                                ),
+                                foregroundColor: priorityColor,
+                                borderColor: priorityColor.withValues(
+                                  alpha: isDark ? 0.45 : 0.25,
+                                ),
+                                fontSize: 10,
+                              ),
+                              for (final conversation
+                                  in widget.todo.conversations.values)
+                                _InlineChip(
+                                  label: conversation.sessionId.trim().isEmpty
+                                      ? conversation.agent.label
+                                      : conversation.sessionId,
+                                  backgroundColor: colorScheme.primaryContainer
+                                      .withValues(alpha: 0.28),
+                                  foregroundColor: colorScheme.primary,
+                                  borderColor: colorScheme.primary.withValues(
+                                    alpha: 0.24,
+                                  ),
+                                  fontSize: 9,
+                                  fontFamily: 'monospace',
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  AnimatedOpacity(
+                    opacity: showInlineTools ? 1 : 0,
+                    duration: const Duration(milliseconds: 100),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: 'Edit todo',
+                          onPressed: () => widget.onEditTodo(widget.todo),
+                          icon: const Icon(Icons.edit_outlined, size: 13),
                           color: colorScheme.onSurfaceVariant,
                         ),
-                      ),
-                      if (agentCount > 0) ...[
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: todo.conversations.values.map((
-                            conversation,
-                          ) {
-                            return Chip(
-                              avatar: const Icon(
-                                Icons.smart_toy_outlined,
-                                size: 16,
-                              ),
-                              label: Text(conversation.agent.label),
-                              visualDensity: VisualDensity.compact,
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                            );
-                          }).toList(),
+                        IconButton(
+                          tooltip: 'Delete todo',
+                          onPressed: () => widget.onDeleteTodo(widget.todo),
+                          icon: const Icon(Icons.delete_outline, size: 13),
+                          color: colorScheme.error,
                         ),
                       ],
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
-              IconButton(
-                tooltip: 'Edit todo',
-                onPressed: () => onEditTodo(todo),
-                icon: const Icon(Icons.edit_outlined),
-              ),
-              IconButton(
-                tooltip: 'Delete todo',
-                onPressed: () => onDeleteTodo(todo),
-                icon: const Icon(Icons.delete_outline),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -2326,18 +2352,23 @@ class _TodoTile extends StatelessWidget {
 }
 
 class _DragHandle extends StatelessWidget {
-  const _DragHandle({required this.color});
+  const _DragHandle({required this.color, required this.visible});
 
   final Color color;
+  final bool visible;
 
   @override
   Widget build(BuildContext context) {
     return Tooltip(
       message: 'Move priority',
-      child: SizedBox(
-        width: 28,
-        height: 44,
-        child: Icon(Icons.drag_indicator_rounded, color: color),
+      child: AnimatedOpacity(
+        opacity: visible ? 1 : 0,
+        duration: const Duration(milliseconds: 100),
+        child: SizedBox(
+          width: 20,
+          height: 28,
+          child: Icon(Icons.drag_indicator_rounded, size: 14, color: color),
+        ),
       ),
     );
   }
@@ -2354,14 +2385,13 @@ class _TodoDragPreview extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     return Material(
-      elevation: 10,
       color: colorScheme.surface,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(6),
       child: Container(
         width: 360,
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(6),
           border: Border.all(color: todo.priority.color(colorScheme)),
         ),
         child: Row(
@@ -2369,10 +2399,10 @@ class _TodoDragPreview extends StatelessWidget {
           children: [
             Icon(
               todo.priority.icon,
-              size: 18,
+              size: 16,
               color: todo.priority.color(colorScheme),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
                 todo.title,
@@ -2381,6 +2411,7 @@ class _TodoDragPreview extends StatelessWidget {
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurface,
                   fontWeight: FontWeight.w600,
+                  fontSize: 12,
                 ),
               ),
             ),
@@ -2391,34 +2422,1046 @@ class _TodoDragPreview extends StatelessWidget {
   }
 }
 
-class _AgentPanel extends StatefulWidget {
-  const _AgentPanel({
+class _TitleBar extends StatelessWidget {
+  const _TitleBar({
+    required this.projectName,
+    required this.openCount,
+    required this.doneCount,
+    required this.themeMode,
+    required this.onToggleTheme,
+    required this.onOpenSettings,
+    required this.onOpenIssue,
+  });
+
+  final String? projectName;
+  final int openCount;
+  final int doneCount;
+  final Brightness themeMode;
+  final VoidCallback onToggleTheme;
+  final VoidCallback? onOpenSettings;
+  final VoidCallback? onOpenIssue;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      height: 38,
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        border: Border(bottom: BorderSide(color: colorScheme.outlineVariant)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        children: [
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            child: Row(
+              children: const [
+                _WindowDot(color: Color(0xFFFF5F57)),
+                SizedBox(width: 5),
+                _WindowDot(color: Color(0xFFFFBD2E)),
+                SizedBox(width: 5),
+                _WindowDot(color: Color(0xFF28CA41)),
+              ],
+            ),
+          ),
+          Text(
+            'Todo Desk',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          if (projectName != null) ...[
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                '— $projectName',
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontSize: 11,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+          const Spacer(),
+          _HeaderStat(
+            label: 'Open',
+            value: openCount.toString(),
+            accentColor: colorScheme.primary,
+          ),
+          const SizedBox(width: 6),
+          _HeaderStat(
+            label: 'Done',
+            value: doneCount.toString(),
+            accentColor: Colors.green.shade600,
+          ),
+          const SizedBox(width: 10),
+          IconButton(
+            tooltip: themeMode == Brightness.dark
+                ? 'Light theme'
+                : 'Dark theme',
+            onPressed: onToggleTheme,
+            icon: Icon(
+              themeMode == Brightness.dark
+                  ? Icons.dark_mode_outlined
+                  : Icons.light_mode_outlined,
+              size: 14,
+            ),
+          ),
+          IconButton(
+            tooltip: 'Settings',
+            onPressed: onOpenSettings,
+            icon: const Icon(Icons.settings_outlined, size: 14),
+          ),
+          IconButton(
+            tooltip: 'Import issue',
+            onPressed: onOpenIssue,
+            icon: const Icon(Icons.add_link_outlined, size: 14),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WindowDot extends StatelessWidget {
+  const _WindowDot({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 11,
+      height: 11,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    );
+  }
+}
+
+class _HeaderStat extends StatelessWidget {
+  const _HeaderStat({
+    required this.label,
+    required this.value,
+    required this.accentColor,
+  });
+
+  final String label;
+  final String value;
+  final Color accentColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        border: Border.all(color: colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontSize: 10,
+              color: accentColor,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            value,
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontSize: 10,
+              fontFamily: 'monospace',
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InlineChip extends StatelessWidget {
+  const _InlineChip({
+    required this.label,
+    required this.backgroundColor,
+    required this.foregroundColor,
+    required this.borderColor,
+    this.fontSize = 10,
+    this.fontFamily,
+    this.icon,
+  });
+
+  final String label;
+  final Color backgroundColor;
+  final Color foregroundColor;
+  final Color borderColor;
+  final double fontSize;
+  final String? fontFamily;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textStyle = theme.textTheme.labelSmall?.copyWith(
+      fontSize: fontSize,
+      fontWeight: FontWeight.w500,
+      color: foregroundColor,
+      fontFamily: fontFamily,
+    );
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 9, color: foregroundColor),
+            const SizedBox(width: 3),
+          ],
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textStyle,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniSegmentItem<T> {
+  const _MiniSegmentItem({
+    required this.value,
+    required this.label,
+    required this.icon,
+  });
+
+  final T value;
+  final String label;
+  final IconData icon;
+}
+
+class _MiniSegmentedButton<T> extends StatelessWidget {
+  const _MiniSegmentedButton({
+    required this.items,
+    required this.selectedValue,
+    required this.onChanged,
+    this.expand = false,
+  });
+
+  final List<_MiniSegmentItem<T>> items;
+  final T selectedValue;
+  final ValueChanged<T>? onChanged;
+  final bool expand;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final disabled = onChanged == null;
+
+    final children = items.map((item) {
+      final selected = item.value == selectedValue;
+      final segment = AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        decoration: BoxDecoration(
+          color: selected ? colorScheme.surface : Colors.transparent,
+          borderRadius: BorderRadius.circular(4),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: colorScheme.shadow.withValues(alpha: 0.06),
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(4),
+            onTap: disabled ? null : () => onChanged!(item.value),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Text(
+                    item.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: selected
+                          ? colorScheme.onSurface
+                          : colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  Opacity(opacity: 0, child: Icon(item.icon, size: 13)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      if (expand) {
+        return Expanded(child: segment);
+      }
+      return segment;
+    }).toList();
+
+    return Opacity(
+      opacity: disabled ? 0.55 : 1,
+      child: Container(
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainer,
+          border: Border.all(color: colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        padding: const EdgeInsets.all(2),
+        child: Row(
+          mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
+          children: [
+            for (var index = 0; index < children.length; index++) ...[
+              if (index > 0) const SizedBox(width: 1),
+              children[index],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ToolbarDivider extends StatelessWidget {
+  const _ToolbarDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 18,
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      color: Theme.of(context).colorScheme.outlineVariant,
+    );
+  }
+}
+
+class _DialogSection extends StatelessWidget {
+  const _DialogSection({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainer,
+        border: Border.all(color: colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _Sidebar extends StatelessWidget {
+  const _Sidebar({
+    required this.scrollController,
+    required this.projects,
+    required this.selectedProject,
+    required this.isLoading,
+    required this.notice,
+    required this.onProjectSelected,
+    required this.onAddProject,
+    required this.onEditProject,
+    required this.onShowAll,
+    required this.onShowToday,
+    required this.onClearCompleted,
+  });
+
+  final ScrollController scrollController;
+  final List<TodoProject> projects;
+  final TodoProject? selectedProject;
+  final bool isLoading;
+  final String? notice;
+  final ValueChanged<String> onProjectSelected;
+  final VoidCallback onAddProject;
+  final Future<void> Function(TodoProject)? onEditProject;
+  final VoidCallback onShowAll;
+  final VoidCallback onShowToday;
+  final VoidCallback onClearCompleted;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      width: 220,
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        border: Border(right: BorderSide(color: colorScheme.outlineVariant)),
+      ),
+      child: Column(
+        children: [
+          Expanded(
+            child: ListView(
+              controller: scrollController,
+              padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
+              children: [
+                _SidebarSectionHeader(
+                  title: '项目',
+                  action: IconButton(
+                    tooltip: 'New project',
+                    onPressed: isLoading ? null : onAddProject,
+                    icon: const Icon(Icons.add, size: 12),
+                  ),
+                ),
+                if (projects.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(
+                      '暂无项目',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontSize: 11,
+                      ),
+                    ),
+                  )
+                else
+                  ...projects.map(
+                    (project) => Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: _SidebarProjectItem(
+                        project: project,
+                        selected: project.id == selectedProject?.id,
+                        onTap: () => onProjectSelected(project.id),
+                        onEdit: onEditProject == null
+                            ? null
+                            : () => unawaited(onEditProject!(project)),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 6),
+                const _SidebarSectionHeader(title: '快速操作'),
+                _SidebarActionItem(
+                  icon: Icons.list_outlined,
+                  label: '所有任务',
+                  selected: false,
+                  onTap: onShowAll,
+                ),
+                _SidebarActionItem(
+                  icon: Icons.calendar_month_outlined,
+                  label: '今天',
+                  selected: false,
+                  onTap: onShowToday,
+                ),
+                _SidebarActionItem(
+                  icon: Icons.dashboard_outlined,
+                  label: '工作台',
+                  selected: true,
+                  onTap: () {},
+                ),
+                const _SidebarSectionHeader(title: '当前项目路径'),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    selectedProject?.folderPath ?? '未选择项目',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontSize: 10,
+                      color: colorScheme.onSurfaceVariant,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+                if (notice != null) ...[
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: colorScheme.errorContainer,
+                        border: Border.all(color: colorScheme.outlineVariant),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        notice!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 10,
+                          color: colorScheme.onErrorContainer,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            child: OutlinedButton.icon(
+              onPressed: isLoading ? null : onClearCompleted,
+              icon: const Icon(Icons.checklist_outlined),
+              label: const Text('清除已完成'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SidebarSectionHeader extends StatelessWidget {
+  const _SidebarSectionHeader({required this.title, this.action});
+
+  final String title;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 8, 4),
+      child: Row(
+        children: [
+          Text(
+            title.toUpperCase(),
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontSize: 10,
+              letterSpacing: 0,
+              fontWeight: FontWeight.w600,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const Spacer(),
+          ?action,
+        ],
+      ),
+    );
+  }
+}
+
+class _SidebarProjectItem extends StatelessWidget {
+  const _SidebarProjectItem({
+    required this.project,
+    required this.selected,
+    required this.onTap,
+    required this.onEdit,
+  });
+
+  final TodoProject project;
+  final bool selected;
+  final VoidCallback onTap;
+  final VoidCallback? onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Material(
+      color: selected
+          ? colorScheme.primaryContainer.withValues(alpha: 0.35)
+          : Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          child: Row(
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: selected
+                      ? colorScheme.primary
+                      : colorScheme.outlineVariant,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  project.name,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontSize: 12,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined, size: 10),
+                tooltip: 'Edit project',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SidebarActionItem extends StatelessWidget {
+  const _SidebarActionItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.selected = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Material(
+        color: selected
+            ? colorScheme.primaryContainer.withValues(alpha: 0.28)
+            : Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 13,
+                  color: selected
+                      ? colorScheme.primary
+                      : colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontSize: 12,
+                    color: selected
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MainWorkspace extends StatelessWidget {
+  const _MainWorkspace({
+    required this.project,
+    required this.isLoading,
+    required this.dateFilterMode,
+    required this.selectedDate,
+    required this.rangeStart,
+    required this.rangeEnd,
+    required this.filter,
+    required this.visibleTodos,
+    required this.selectedTodoId,
+    required this.scrollController,
+    required this.onAddTodo,
+    required this.addController,
+    required this.addFocusNode,
+    required this.selectedPriority,
+    required this.onQuickAddPriorityChanged,
+    required this.onFilterChanged,
+    required this.onDateModeChanged,
+    required this.onPickSingleDate,
+    required this.onPickDateRange,
+    required this.onSelectTodo,
+    required this.onToggleTodo,
+    required this.onPriorityChanged,
+    required this.onEditTodo,
+    required this.onDeleteTodo,
+  });
+
+  final TodoProject? project;
+  final bool isLoading;
+  final DateFilterMode dateFilterMode;
+  final DateTime selectedDate;
+  final DateTime rangeStart;
+  final DateTime rangeEnd;
+  final TodoFilter filter;
+  final List<TodoItem> visibleTodos;
+  final String? selectedTodoId;
+  final ScrollController scrollController;
+  final VoidCallback onAddTodo;
+  final TextEditingController addController;
+  final FocusNode addFocusNode;
+  final TodoPriority selectedPriority;
+  final ValueChanged<TodoPriority> onQuickAddPriorityChanged;
+  final ValueChanged<TodoFilter> onFilterChanged;
+  final ValueChanged<DateFilterMode> onDateModeChanged;
+  final VoidCallback onPickSingleDate;
+  final VoidCallback onPickDateRange;
+  final ValueChanged<TodoItem> onSelectTodo;
+  final void Function(TodoItem todo, bool? completed) onToggleTodo;
+  final void Function(TodoItem todo, TodoPriority priority) onPriorityChanged;
+  final ValueChanged<TodoItem> onEditTodo;
+  final ValueChanged<TodoItem> onDeleteTodo;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      color: colorScheme.surface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _WorkspaceToolbar(
+            project: project,
+            dateFilterMode: dateFilterMode,
+            selectedDate: selectedDate,
+            rangeStart: rangeStart,
+            rangeEnd: rangeEnd,
+            filter: filter,
+            isLoading: isLoading,
+            addController: addController,
+            addFocusNode: addFocusNode,
+            selectedPriority: selectedPriority,
+            onAddTodo: onAddTodo,
+            onQuickAddPriorityChanged: onQuickAddPriorityChanged,
+            onFilterChanged: onFilterChanged,
+            onDateModeChanged: onDateModeChanged,
+            onPickSingleDate: onPickSingleDate,
+            onPickDateRange: onPickDateRange,
+          ),
+          Expanded(
+            child: isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(strokeWidth: 2.5),
+                  )
+                : visibleTodos.isEmpty
+                ? _EmptyState(
+                    filter: filter,
+                    dateLabel: _dateLabelFromMode(
+                      dateFilterMode,
+                      selectedDate,
+                      rangeStart,
+                      rangeEnd,
+                    ),
+                  )
+                : Scrollbar(
+                    controller: scrollController,
+                    thumbVisibility: true,
+                    child: ListView(
+                      controller: scrollController,
+                      padding: EdgeInsets.zero,
+                      children: [
+                        for (final priority in TodoPriority.values)
+                          _TodoPrioritySection(
+                            priority: priority,
+                            todos: visibleTodos
+                                .where((todo) => todo.priority == priority)
+                                .toList(),
+                            selectedTodoId: selectedTodoId,
+                            onSelectTodo: onSelectTodo,
+                            onToggleTodo: onToggleTodo,
+                            onPriorityChanged: onPriorityChanged,
+                            onEditTodo: onEditTodo,
+                            onDeleteTodo: onDeleteTodo,
+                          ),
+                      ],
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _dateLabelFromMode(
+  DateFilterMode mode,
+  DateTime selectedDate,
+  DateTime rangeStart,
+  DateTime rangeEnd,
+) {
+  switch (mode) {
+    case DateFilterMode.today:
+      return 'Today';
+    case DateFilterMode.day:
+      return _formatDate(selectedDate);
+    case DateFilterMode.range:
+      return '${_formatDate(rangeStart)} to ${_formatDate(rangeEnd)}';
+    case DateFilterMode.all:
+      return 'All dates';
+  }
+}
+
+class _WorkspaceToolbar extends StatelessWidget {
+  const _WorkspaceToolbar({
+    required this.project,
+    required this.dateFilterMode,
+    required this.selectedDate,
+    required this.rangeStart,
+    required this.rangeEnd,
+    required this.filter,
+    required this.isLoading,
+    required this.addController,
+    required this.addFocusNode,
+    required this.selectedPriority,
+    required this.onAddTodo,
+    required this.onQuickAddPriorityChanged,
+    required this.onFilterChanged,
+    required this.onDateModeChanged,
+    required this.onPickSingleDate,
+    required this.onPickDateRange,
+  });
+
+  final TodoProject? project;
+  final DateFilterMode dateFilterMode;
+  final DateTime selectedDate;
+  final DateTime rangeStart;
+  final DateTime rangeEnd;
+  final TodoFilter filter;
+  final bool isLoading;
+  final TextEditingController addController;
+  final FocusNode addFocusNode;
+  final TodoPriority selectedPriority;
+  final VoidCallback onAddTodo;
+  final ValueChanged<TodoPriority> onQuickAddPriorityChanged;
+  final ValueChanged<TodoFilter> onFilterChanged;
+  final ValueChanged<DateFilterMode> onDateModeChanged;
+  final VoidCallback onPickSingleDate;
+  final VoidCallback onPickDateRange;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final canAdd = !isLoading && project != null;
+    final quickAdd = ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 300, minWidth: 300),
+      child: Row(
+        children: [
+          Expanded(
+            child: Semantics(
+              textField: true,
+              label: 'New task',
+              child: TextField(
+                controller: addController,
+                focusNode: addFocusNode,
+                enabled: canAdd,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => onAddTodo(),
+                decoration: const InputDecoration(
+                  hintText: '新增任务，按 Enter 确认...',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          SizedBox(
+            width: 90,
+            child: DropdownButtonFormField<TodoPriority>(
+              initialValue: selectedPriority,
+              isExpanded: true,
+              items: TodoPriority.values
+                  .map(
+                    (priority) => DropdownMenuItem<TodoPriority>(
+                      value: priority,
+                      child: Text(priority.label),
+                    ),
+                  )
+                  .toList(),
+              onChanged: canAdd
+                  ? (priority) {
+                      if (priority != null) {
+                        onQuickAddPriorityChanged(priority);
+                      }
+                    }
+                  : null,
+              decoration: const InputDecoration(border: OutlineInputBorder()),
+            ),
+          ),
+          const SizedBox(width: 6),
+          FilledButton.icon(
+            onPressed: canAdd ? onAddTodo : null,
+            icon: const Icon(Icons.add_rounded, size: 11),
+            label: const Text('添加'),
+          ),
+        ],
+      ),
+    );
+
+    final filters = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _DateFilterControl(
+          mode: dateFilterMode,
+          selectedDate: selectedDate,
+          rangeStart: rangeStart,
+          rangeEnd: rangeEnd,
+          onModeChanged: onDateModeChanged,
+          onPickSingleDate: onPickSingleDate,
+          onPickDateRange: onPickDateRange,
+        ),
+        const _ToolbarDivider(),
+        _MiniSegmentedButton<TodoFilter>(
+          selectedValue: filter,
+          onChanged: onFilterChanged,
+          items: const [
+            _MiniSegmentItem<TodoFilter>(
+              value: TodoFilter.all,
+              label: '全部',
+              icon: Icons.list_alt_outlined,
+            ),
+            _MiniSegmentItem<TodoFilter>(
+              value: TodoFilter.active,
+              label: 'Open',
+              icon: Icons.radio_button_unchecked_outlined,
+            ),
+            _MiniSegmentItem<TodoFilter>(
+              value: TodoFilter.completed,
+              label: 'Done',
+              icon: Icons.check_circle_outline,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        border: Border(bottom: BorderSide(color: colorScheme.outlineVariant)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 680;
+          if (compact) {
+            return Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [quickAdd, filters],
+            );
+          }
+
+          return Row(
+            children: [
+              quickAdd,
+              const _ToolbarDivider(),
+              Flexible(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: filters,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _AgentWorkspace extends StatefulWidget {
+  const _AgentWorkspace({
     required this.todo,
     required this.selectedAgent,
     required this.runningAgent,
     required this.onAgentChanged,
     required this.onRun,
+    required this.scrollController,
+    this.onStop,
+    this.onClearHistory,
   });
 
   final TodoItem? todo;
   final AgentKind selectedAgent;
   final AgentKind? runningAgent;
   final ValueChanged<AgentKind> onAgentChanged;
-  final Future<void> Function(String instruction)? onRun;
+  final Future<void> Function(String instruction, {bool continueSession})?
+  onRun;
+  final ScrollController scrollController;
+  final VoidCallback? onStop;
+  final VoidCallback? onClearHistory;
 
   @override
-  State<_AgentPanel> createState() => _AgentPanelState();
+  State<_AgentWorkspace> createState() => _AgentWorkspaceState();
 }
 
-class _AgentPanelState extends State<_AgentPanel> {
+class _AgentWorkspaceState extends State<_AgentWorkspace> {
   final TextEditingController _instructionController = TextEditingController(
     text: 'Please handle this todo and report the result.',
   );
+  final TextEditingController _sessionController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _syncSessionController();
+  }
+
+  @override
+  void didUpdateWidget(covariant _AgentWorkspace oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.todo?.id != widget.todo?.id ||
+        oldWidget.selectedAgent != widget.selectedAgent) {
+      _syncSessionController();
+    }
+  }
 
   @override
   void dispose() {
     _instructionController.dispose();
+    _sessionController.dispose();
     super.dispose();
+  }
+
+  void _syncSessionController() {
+    final sessionId =
+        widget.todo?.conversations[widget.selectedAgent]?.sessionId ?? '';
+    if (_sessionController.text != sessionId) {
+      _sessionController.text = sessionId;
+    }
   }
 
   @override
@@ -2428,173 +3471,284 @@ class _AgentPanelState extends State<_AgentPanel> {
     final todo = widget.todo;
     final conversation = todo?.conversations[widget.selectedAgent];
     final isRunning = widget.runningAgent != null;
-    final header = Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Agent',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    todo == null ? 'Select a todo first' : todo.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (isRunning)
-              SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  color: colorScheme.primary,
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        SegmentedButton<AgentKind>(
-          segments: const [
-            ButtonSegment<AgentKind>(
-              value: AgentKind.codex,
-              label: Text('Codex'),
-              icon: Icon(Icons.terminal_outlined),
-            ),
-            ButtonSegment<AgentKind>(
-              value: AgentKind.claudeCode,
-              label: Text('Claude'),
-              icon: Icon(Icons.code_outlined),
-            ),
-            ButtonSegment<AgentKind>(
-              value: AgentKind.openClaw,
-              label: Text('OpenClaw'),
-              icon: Icon(Icons.hub_outlined),
-            ),
-          ],
-          selected: <AgentKind>{widget.selectedAgent},
-          onSelectionChanged: isRunning
-              ? null
-              : (selection) => widget.onAgentChanged(selection.first),
-        ),
-        const SizedBox(height: 14),
-        TextField(
-          controller: _instructionController,
-          enabled: todo != null && !isRunning,
-          minLines: 2,
-          maxLines: 4,
-          decoration: const InputDecoration(
-            labelText: 'Instruction',
-            alignLabelWithHint: true,
-            prefixIcon: Icon(Icons.assignment_outlined),
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 12),
-        FilledButton.icon(
-          onPressed: todo == null || isRunning || widget.onRun == null
-              ? null
-              : () => widget.onRun!(_instructionController.text),
-          icon: Icon(
-            conversation == null
-                ? Icons.play_arrow_outlined
-                : Icons.redo_outlined,
-          ),
-          label: Text(conversation == null ? 'Send to agent' : 'Continue'),
-        ),
-      ],
-    );
+
+    final canRun = todo != null && !isRunning && widget.onRun != null;
+    final canContinue = canRun && conversation != null;
+    final priorityColor =
+        todo?.priority.color(colorScheme) ?? colorScheme.primary;
+    final isDark = theme.brightness == Brightness.dark;
 
     return DecoratedBox(
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: ListView(
-                children: [
-                  header,
-                  const SizedBox(height: 16),
-                  if (conversation != null)
-                    _ConversationSummary(conversation: conversation)
-                  else
-                    Text(
-                      'No saved conversation for ${widget.selectedAgent.label}.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  const SizedBox(height: 12),
-                  if (conversation == null || conversation.runs.isEmpty)
-                    _AgentEmptyState(agent: widget.selectedAgent)
-                  else
-                    ...conversation.runs.map(
-                      (run) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _AgentRunCard(run: run),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ConversationSummary extends StatelessWidget {
-  const _ConversationSummary({required this.conversation});
-
-  final AgentConversation conversation;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final sessionId = conversation.sessionId.trim().isEmpty
-        ? 'Not reported yet'
-        : conversation.sessionId;
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
+        border: Border(left: BorderSide(color: colorScheme.outlineVariant)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            '${conversation.agent.label} conversation',
-            style: theme.textTheme.labelLarge,
+          Container(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: colorScheme.outlineVariant),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Agent 工作台',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'About agents',
+                      onPressed: () {},
+                      icon: const Icon(Icons.help_outline, size: 12),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  constraints: const BoxConstraints(minHeight: 36),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainer,
+                    border: Border.all(color: colorScheme.outlineVariant),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: todo == null
+                      ? Text(
+                          '未选择任务 — 点击左侧 Todo 以选中',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontSize: 11,
+                          ),
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              todo.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            _InlineChip(
+                              label: todo.priority.label,
+                              backgroundColor: priorityColor.withValues(
+                                alpha: isDark ? 0.18 : 0.09,
+                              ),
+                              foregroundColor: priorityColor,
+                              borderColor: priorityColor.withValues(
+                                alpha: isDark ? 0.45 : 0.25,
+                              ),
+                              fontSize: 10,
+                            ),
+                          ],
+                        ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '选择 Agent',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                DropdownButtonFormField<AgentKind>(
+                  initialValue: widget.selectedAgent,
+                  isExpanded: true,
+                  items: AgentKind.values
+                      .map(
+                        (agent) => DropdownMenuItem<AgentKind>(
+                          value: agent,
+                          child: Text(agent.label),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: isRunning
+                      ? null
+                      : (agent) {
+                          if (agent != null) {
+                            widget.onAgentChanged(agent);
+                          }
+                        },
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 7,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _instructionController,
+                  enabled: todo != null && !isRunning,
+                  minLines: 3,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Instruction',
+                    alignLabelWithHint: true,
+                    hintText: 'Describe what the agent should do...',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _sessionController,
+                        enabled: false,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontFamily: 'monospace',
+                          fontSize: 11,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Session ID',
+                          hintText: 'Leave blank to create a new session',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    OutlinedButton(
+                      onPressed: isRunning
+                          ? null
+                          : () {
+                              _sessionController.clear();
+                            },
+                      child: const Text('新会话'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: canRun
+                            ? () => widget.onRun!(
+                                _instructionController.text,
+                                continueSession: false,
+                              )
+                            : null,
+                        icon: const Icon(Icons.send_outlined, size: 12),
+                        label: const Text('Send to agent'),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: canContinue
+                            ? () => widget.onRun!(
+                                _instructionController.text,
+                                continueSession: true,
+                              )
+                            : null,
+                        icon: const Icon(Icons.rotate_left_outlined, size: 12),
+                        label: const Text('Continue'),
+                      ),
+                    ),
+                  ],
+                ),
+                if (isRunning) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Agent 执行中...',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.primary,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: widget.onStop,
+                        child: const Text('停止'),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
           ),
-          const SizedBox(height: 6),
-          SelectableText(
-            'Session ID: $sessionId',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
+          Container(
+            padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: colorScheme.outlineVariant),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '历史记录',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.6,
+                      color: colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.72,
+                      ),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Clear history',
+                  onPressed: conversation == null || isRunning
+                      ? null
+                      : widget.onClearHistory,
+                  icon: const Icon(Icons.delete_outline, size: 11),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              controller: widget.scrollController,
+              children: [
+                if (conversation == null || conversation.runs.isEmpty)
+                  const _AgentEmptyState()
+                else
+                  ...conversation.runs.map(
+                    (run) => _AgentRunCard(
+                      run: run,
+                      agent: widget.selectedAgent,
+                      sessionId: conversation.sessionId,
+                      todoTitle: todo?.title ?? 'Todo',
+                    ),
+                  ),
+              ],
             ),
           ),
         ],
@@ -2604,70 +3758,122 @@ class _ConversationSummary extends StatelessWidget {
 }
 
 class _AgentRunCard extends StatelessWidget {
-  const _AgentRunCard({required this.run});
+  const _AgentRunCard({
+    required this.run,
+    required this.agent,
+    required this.sessionId,
+    required this.todoTitle,
+  });
 
   final AgentRun run;
+  final AgentKind agent;
+  final String sessionId;
+  final String todoTitle;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final statusColor = run.succeeded ? colorScheme.primary : colorScheme.error;
+    final statusColor = run.succeeded
+        ? Colors.green.shade600
+        : colorScheme.error;
     final output = run.error?.trim().isNotEmpty == true
         ? run.error!.trim()
         : run.output.trim();
+    final sessionLabel = sessionId.trim().isEmpty ? 'No session' : sessionId;
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colorScheme.outlineVariant),
+        border: Border(bottom: BorderSide(color: colorScheme.outlineVariant)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(
-                run.succeeded
-                    ? Icons.check_circle_outline
-                    : Icons.error_outline,
-                size: 18,
-                color: statusColor,
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: statusColor,
+                  shape: BoxShape.circle,
+                ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 5),
               Expanded(
                 child: Text(
-                  run.succeeded ? 'Completed' : 'Failed',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: statusColor,
+                  todoTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
+              _InlineChip(
+                label: run.succeeded ? '成功' : '失败',
+                backgroundColor: statusColor.withValues(alpha: 0.1),
+                foregroundColor: statusColor,
+                borderColor: statusColor.withValues(alpha: 0.24),
+                fontSize: 10,
+                icon: run.succeeded ? Icons.check_rounded : Icons.close_rounded,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              _InlineChip(
+                label: agent.label,
+                backgroundColor: colorScheme.surfaceContainer,
+                foregroundColor: colorScheme.onSurfaceVariant,
+                borderColor: colorScheme.outlineVariant,
+                fontSize: 9,
+                fontFamily: 'monospace',
+              ),
+              const SizedBox(width: 5),
+              Flexible(
+                child: _InlineChip(
+                  label: sessionLabel,
+                  backgroundColor: colorScheme.surfaceContainer,
+                  foregroundColor: colorScheme.onSurfaceVariant,
+                  borderColor: colorScheme.outlineVariant,
+                  fontSize: 9,
+                  fontFamily: 'monospace',
+                ),
+              ),
+              const Spacer(),
               Text(
                 _formatDateTime(run.finishedAt),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
+                  fontSize: 10,
+                  fontFamily: 'monospace',
                 ),
               ),
             ],
           ),
           if (run.instruction.trim().isNotEmpty) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 3),
             Text(
               run.instruction.trim(),
-              maxLines: 3,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
+                fontSize: 10,
               ),
             ),
           ],
-          const SizedBox(height: 10),
-          SelectableText(
-            output.isEmpty ? '(No output)' : output,
-            style: theme.textTheme.bodyMedium,
-          ),
+          if (output.isNotEmpty) ...[
+            const SizedBox(height: 5),
+            SelectableText(
+              output,
+              style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
+            ),
+          ],
         ],
       ),
     );
@@ -2675,9 +3881,7 @@ class _AgentRunCard extends StatelessWidget {
 }
 
 class _AgentEmptyState extends StatelessWidget {
-  const _AgentEmptyState({required this.agent});
-
-  final AgentKind agent;
+  const _AgentEmptyState();
 
   @override
   Widget build(BuildContext context) {
@@ -2686,12 +3890,13 @@ class _AgentEmptyState extends StatelessWidget {
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(16),
         child: Text(
-          'Send this todo to ${agent.label}; the result and session id will be saved here.',
+          '暂无历史记录',
           textAlign: TextAlign.center,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: colorScheme.onSurfaceVariant,
+            fontSize: 11,
           ),
         ),
       ),
@@ -2825,12 +4030,7 @@ class _IssueImportDialogState extends State<_IssueImportDialog> {
             ],
             if (issue != null) ...[
               const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(8),
-                ),
+              _DialogSection(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -2858,8 +4058,8 @@ class _IssueImportDialogState extends State<_IssueImportDialog> {
                     const SizedBox(height: 10),
                     SelectableText(
                       issue.title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -2956,12 +4156,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-              ),
+            _DialogSection(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -2976,7 +4171,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                       Text(
                         'Issue import',
                         style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
@@ -3012,28 +4207,26 @@ class _SettingsDialogState extends State<_SettingsDialog> {
               ),
             ),
             const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                secondary: Icon(
-                  Icons.notifications_active_outlined,
-                  color: colorScheme.primary,
+            _DialogSection(
+              child: Material(
+                color: Colors.transparent,
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: Icon(
+                    Icons.notifications_active_outlined,
+                    color: colorScheme.primary,
+                  ),
+                  title: const Text('Agent completion notifications'),
+                  subtitle: const Text(
+                    'Show a desktop notification when an agent finishes.',
+                  ),
+                  value: _agentCompletionNotificationsEnabled,
+                  onChanged: (value) {
+                    setState(() {
+                      _agentCompletionNotificationsEnabled = value;
+                    });
+                  },
                 ),
-                title: const Text('Agent completion notifications'),
-                subtitle: const Text(
-                  'Show a desktop notification when an agent finishes.',
-                ),
-                value: _agentCompletionNotificationsEnabled,
-                onChanged: (value) {
-                  setState(() {
-                    _agentCompletionNotificationsEnabled = value;
-                  });
-                },
               ),
             ),
           ],
