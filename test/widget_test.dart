@@ -36,15 +36,11 @@ void main() {
     await tester.pumpWidget(TodoApp(store: store, agentRunner: _FakeRunner()));
     await _pumpUi(tester);
 
-    expect(find.text('Todo Desk'), findsOneWidget);
+    expect(find.byKey(const ValueKey('quick-add-button')), findsOneWidget);
+    expect(find.text('Todo Desk'), findsNothing);
     expect(find.text('No tasks yet'), findsOneWidget);
 
-    await tester.enterText(
-      find.widgetWithText(TextField, '新增任务，按 Enter 确认...'),
-      'Review desktop build',
-    );
-    await tester.tap(find.byIcon(Icons.add_rounded));
-    await _pumpUi(tester);
+    await _addTodoThroughDialog(tester, title: 'Review desktop build');
 
     expect(find.text('Review desktop build'), findsAtLeastNWidgets(1));
     expect(find.text('No tasks yet'), findsNothing);
@@ -71,6 +67,331 @@ void main() {
 
     expect(find.text('Review desktop build'), findsNothing);
     expect(find.text('No tasks yet'), findsOneWidget);
+  });
+
+  testWidgets('top bar keeps add action left and tools right', (
+    WidgetTester tester,
+  ) async {
+    _setDesktopSize(tester);
+    final store = MemoryTodoStore();
+
+    await tester.pumpWidget(TodoApp(store: store, agentRunner: _FakeRunner()));
+    await _pumpUi(tester);
+
+    expect(find.text('Todo Desk'), findsNothing);
+
+    final addRect = tester.getRect(
+      find.byKey(const ValueKey('quick-add-button')),
+    );
+    final settingsRect = tester.getRect(find.byTooltip('Settings'));
+    final importRect = tester.getRect(find.byTooltip('Import issue'));
+
+    expect(addRect.left, lessThan(24));
+    expect(settingsRect.left, greaterThan(addRect.right));
+    expect(importRect.right, greaterThan(1200));
+  });
+
+  testWidgets(
+    'todo session chips show agent labels and jump to matching conversation',
+    (WidgetTester tester) async {
+      _setDesktopSize(tester);
+      final store = MemoryTodoStore(
+        TodoData(
+          projects: [
+            TodoProject(
+              id: 'project-1',
+              name: 'Agent Project',
+              folderPath: '/tmp',
+              todos: [
+                TodoItem(
+                  id: 'todo-1',
+                  title: 'Coordinate follow-up',
+                  details: 'Check how the next pass should continue.',
+                  createdAt: DateTime(2026, 6, 22),
+                  priority: TodoPriority.medium,
+                  completed: false,
+                  conversations: {
+                    AgentKind.codex: AgentConversation(
+                      agent: AgentKind.codex,
+                      sessionId: 'codex-session-1',
+                      updatedAt: DateTime(2026, 6, 21, 10),
+                      runs: const [],
+                    ),
+                    AgentKind.claudeCode: AgentConversation(
+                      agent: AgentKind.claudeCode,
+                      sessionId: 'claude-session-1',
+                      updatedAt: DateTime(2026, 6, 22, 9),
+                      runs: const [],
+                    ),
+                  },
+                ),
+              ],
+            ),
+          ],
+          selectedProjectId: 'project-1',
+        ),
+      );
+
+      await tester.pumpWidget(
+        TodoApp(store: store, agentRunner: _FakeRunner()),
+      );
+      await _pumpUi(tester);
+
+      expect(find.text('Codex · codex-session-1'), findsOneWidget);
+      expect(find.text('Claude Code · claude-session-1'), findsOneWidget);
+
+      await tester.tap(find.text('Claude Code · claude-session-1'));
+      await _pumpUi(tester);
+
+      final sessionField = tester.widget<TextField>(
+        find.widgetWithText(TextField, 'Session ID'),
+      );
+      expect(sessionField.controller?.text, 'claude-session-1');
+    },
+  );
+
+  testWidgets('multi-turn agent history shows latest messages first', (
+    WidgetTester tester,
+  ) async {
+    _setDesktopSize(tester);
+    final store = MemoryTodoStore(
+      TodoData(
+        projects: [
+          TodoProject(
+            id: 'project-1',
+            name: 'History Project',
+            folderPath: '/tmp',
+            todos: [
+              TodoItem(
+                id: 'todo-1',
+                title: 'Trace conversation history',
+                details: 'Show the latest turns at the top of the right panel.',
+                createdAt: DateTime(2026, 6, 22),
+                priority: TodoPriority.medium,
+                completed: false,
+                conversations: {
+                  AgentKind.codex: AgentConversation(
+                    agent: AgentKind.codex,
+                    sessionId: 'codex-history-1',
+                    updatedAt: DateTime(2026, 6, 22, 11),
+                    runs: [
+                      AgentRun(
+                        id: 'run-2',
+                        agentId: AgentKind.codex.id,
+                        instruction: 'Follow up turn',
+                        output: 'Second agent reply',
+                        error: null,
+                        exitCode: 0,
+                        startedAt: DateTime(2026, 6, 22, 11, 10),
+                        finishedAt: DateTime(2026, 6, 22, 11, 12),
+                      ),
+                      AgentRun(
+                        id: 'run-1',
+                        agentId: AgentKind.codex.id,
+                        instruction: 'Initial turn',
+                        output: 'First agent reply',
+                        error: null,
+                        exitCode: 0,
+                        startedAt: DateTime(2026, 6, 22, 10, 40),
+                        finishedAt: DateTime(2026, 6, 22, 10, 42),
+                      ),
+                    ],
+                  ),
+                },
+              ),
+            ],
+          ),
+        ],
+        selectedProjectId: 'project-1',
+      ),
+    );
+
+    await tester.pumpWidget(TodoApp(store: store, agentRunner: _FakeRunner()));
+    await _pumpUi(tester);
+    await tester.tap(find.text('Trace conversation history'));
+    await _pumpUi(tester);
+
+    expect(find.text('Initial turn'), findsOneWidget);
+    expect(find.text('First agent reply'), findsOneWidget);
+    expect(find.text('Follow up turn'), findsOneWidget);
+    expect(find.text('Second agent reply'), findsOneWidget);
+
+    expect(
+      tester.getTopLeft(find.text('Follow up turn')).dy,
+      lessThan(tester.getTopLeft(find.text('Initial turn')).dy),
+    );
+    expect(
+      tester.getTopLeft(find.text('Second agent reply')).dy,
+      lessThan(tester.getTopLeft(find.text('First agent reply')).dy),
+    );
+  });
+
+  testWidgets(
+    'agent instruction clears after send and resets for new context',
+    (WidgetTester tester) async {
+      _setDesktopSize(tester);
+      final store = MemoryTodoStore();
+      final runner = _FakeRunner();
+
+      await tester.pumpWidget(TodoApp(store: store, agentRunner: runner));
+      await _pumpUi(tester);
+
+      await _addTodoThroughDialog(tester, title: 'First agent task');
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Instruction'),
+        'Run the first pass',
+      );
+      await tester.tap(find.text('Send to agent'));
+      await _pumpUi(tester);
+
+      expect(runner.requests.single.instruction, 'Run the first pass');
+      expect(_agentInstructionText(tester), isEmpty);
+
+      await _addTodoThroughDialog(tester, title: 'Second agent task');
+      expect(
+        _agentInstructionText(tester),
+        'Please handle this todo and report the result.',
+      );
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Instruction'),
+        'Draft a new session prompt',
+      );
+      await tester.tap(find.text('新会话'));
+      await _pumpUi(tester);
+
+      expect(
+        _agentInstructionText(tester),
+        'Please handle this todo and report the result.',
+      );
+    },
+  );
+
+  testWidgets('send continues existing agent session by default', (
+    WidgetTester tester,
+  ) async {
+    _setDesktopSize(tester);
+    final store = MemoryTodoStore();
+    final runner = _FakeRunner();
+
+    await tester.pumpWidget(TodoApp(store: store, agentRunner: runner));
+    await _pumpUi(tester);
+
+    await _addTodoThroughDialog(tester, title: 'Keep one Codex thread');
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Instruction'),
+      'First turn',
+    );
+    await tester.tap(find.text('Send to agent'));
+    await _pumpUi(tester);
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Instruction'),
+      'Second turn',
+    );
+    await tester.tap(find.text('Send to agent'));
+    await _pumpUi(tester);
+
+    expect(runner.requests, hasLength(2));
+    expect(runner.requests.first.conversation, isNull);
+    expect(runner.requests.last.conversation?.sessionId, 'test-session-1');
+
+    final savedTodo = (await store.load()).projects.first.todos.first;
+    final conversation = savedTodo.conversations[AgentKind.codex];
+    expect(conversation?.runs.map((run) => run.instruction), [
+      'Second turn',
+      'First turn',
+    ]);
+    expect(find.text('Second turn'), findsOneWidget);
+    expect(find.text('First turn'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Second turn')).dy,
+      lessThan(tester.getTopLeft(find.text('First turn')).dy),
+    );
+  });
+
+  testWidgets('new conversation button makes the next send start fresh', (
+    WidgetTester tester,
+  ) async {
+    _setDesktopSize(tester);
+    final store = MemoryTodoStore();
+    final runner = _FakeRunner();
+
+    await tester.pumpWidget(TodoApp(store: store, agentRunner: runner));
+    await _pumpUi(tester);
+
+    await _addTodoThroughDialog(tester, title: 'Split Codex threads');
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Instruction'),
+      'First thread',
+    );
+    await tester.tap(find.text('Send to agent'));
+    await _pumpUi(tester);
+
+    await tester.tap(find.text('新会话'));
+    await _pumpUi(tester);
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Instruction'),
+      'Fresh thread',
+    );
+    await tester.tap(find.text('Send to agent'));
+    await _pumpUi(tester);
+
+    expect(runner.requests, hasLength(2));
+    expect(runner.requests.first.conversation, isNull);
+    expect(runner.requests.last.conversation, isNull);
+
+    final savedTodo = (await store.load()).projects.first.todos.first;
+    final conversation = savedTodo.conversations[AgentKind.codex];
+    expect(conversation?.sessionId, 'test-session-2');
+    expect(conversation?.runs.map((run) => run.instruction), ['Fresh thread']);
+  });
+
+  testWidgets('add button opens dialog and saves title priority and date', (
+    WidgetTester tester,
+  ) async {
+    _setDesktopSize(tester);
+    final store = MemoryTodoStore();
+
+    await tester.pumpWidget(TodoApp(store: store, agentRunner: _FakeRunner()));
+    await _pumpUi(tester);
+
+    await tester.tap(find.byKey(const ValueKey('quick-add-button')));
+    await _pumpUi(tester);
+
+    expect(find.text('新增待办'), findsOneWidget);
+    expect(find.widgetWithText(TextField, '待办名称'), findsOneWidget);
+    expect(find.widgetWithText(TextField, '待办详情（选填）'), findsOneWidget);
+    expect(find.text('中优先级'), findsOneWidget);
+    expect(find.byKey(const ValueKey('todo-date-button')), findsOneWidget);
+
+    await tester.enterText(find.widgetWithText(TextField, '待办名称'), '写周报');
+    await tester.enterText(
+      find.widgetWithText(TextField, '待办详情（选填）'),
+      '整理本周进展和风险。',
+    );
+    await tester.tap(find.text('中优先级'));
+    await _pumpUi(tester);
+    expect(find.text('高优先级'), findsOneWidget);
+    expect(find.text('低优先级'), findsOneWidget);
+    await tester.tap(find.text('低优先级').last);
+    await _pumpUi(tester);
+    await tester.tap(find.byKey(const ValueKey('todo-date-button')));
+    await _pumpUi(tester);
+    await tester.tap(find.text('15').last);
+    await _pumpUi(tester);
+    await tester.tap(find.text('OK'));
+    await _pumpUi(tester);
+    await tester.tap(find.text('创建待办'));
+    await _pumpUi(tester);
+
+    final savedTodo = (await store.load()).projects.first.todos.first;
+    expect(savedTodo.title, '写周报');
+    expect(savedTodo.details, '整理本周进展和风险。');
+    expect(savedTodo.priority, TodoPriority.low);
+    expect(savedTodo.createdAt.day, 15);
   });
 
   testWidgets('shows all dates by default and can filter today todos', (
@@ -152,12 +473,12 @@ void main() {
     await tester.pumpWidget(TodoApp(store: store, agentRunner: _FakeRunner()));
     await _pumpUi(tester);
 
-    expect(find.text('High priority'), findsOneWidget);
-    expect(find.text('Medium priority'), findsOneWidget);
-    expect(find.text('Low priority'), findsOneWidget);
+    expect(find.text('高优先级'), findsOneWidget);
+    expect(find.text('中优先级'), findsOneWidget);
+    expect(find.text('低优先级'), findsOneWidget);
 
     final dragStart = tester.getCenter(find.byTooltip('Move priority'));
-    final dragEnd = tester.getCenter(find.text('High priority'));
+    final dragEnd = tester.getCenter(find.text('高优先级'));
     final gesture = await tester.startGesture(dragStart);
     await tester.pump();
     await gesture.moveTo(dragEnd);
@@ -260,12 +581,7 @@ void main() {
     final savedSettings = await store.load();
     expect(savedSettings.settings.agentCompletionNotificationsEnabled, isFalse);
 
-    await tester.enterText(
-      find.widgetWithText(TextField, '新增任务，按 Enter 确认...'),
-      'Silent agent',
-    );
-    await tester.tap(find.byIcon(Icons.add_rounded));
-    await _pumpUi(tester);
+    await _addTodoThroughDialog(tester, title: 'Silent agent');
 
     await tester.tap(find.text('Send to agent'));
     await _pumpUi(tester);
@@ -290,12 +606,7 @@ void main() {
     );
     await _pumpUi(tester);
 
-    await tester.enterText(
-      find.widgetWithText(TextField, '新增任务，按 Enter 确认...'),
-      'Ask agent',
-    );
-    await tester.tap(find.byIcon(Icons.add_rounded));
-    await _pumpUi(tester);
+    await _addTodoThroughDialog(tester, title: 'Ask agent');
 
     final settingsButton = find.byTooltip('Settings');
     final importButton = find.byTooltip('Import issue');
@@ -337,12 +648,7 @@ void main() {
     );
     await _pumpUi(tester);
 
-    await tester.enterText(
-      find.widgetWithText(TextField, '新增任务，按 Enter 确认...'),
-      'Fix failure',
-    );
-    await tester.tap(find.byIcon(Icons.add_rounded));
-    await _pumpUi(tester);
+    await _addTodoThroughDialog(tester, title: 'Fix failure');
 
     await tester.tap(find.text('Send to agent'));
     await _pumpUi(tester);
@@ -370,23 +676,52 @@ Future<void> _pumpUi(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 300));
 }
 
+String _agentInstructionText(WidgetTester tester) {
+  final instructionField = tester.widget<TextField>(
+    find.widgetWithText(TextField, 'Instruction'),
+  );
+  return instructionField.controller?.text ?? '';
+}
+
+Future<void> _addTodoThroughDialog(
+  WidgetTester tester, {
+  required String title,
+  String details = '',
+}) async {
+  await tester.tap(find.byKey(const ValueKey('quick-add-button')));
+  await _pumpUi(tester);
+  await tester.enterText(find.widgetWithText(TextField, '待办名称'), title);
+  if (details.isNotEmpty) {
+    await tester.enterText(find.widgetWithText(TextField, '待办详情（选填）'), details);
+  }
+  await tester.tap(find.text('创建待办'));
+  await _pumpUi(tester);
+}
+
 class _FakeRunner implements AgentTaskRunner {
   _FakeRunner({this.error, this.exitCode = 0});
 
   final List<AgentTaskRequest> requests = <AgentTaskRequest>[];
   final String? error;
   final int exitCode;
+  int _sessionCount = 0;
 
   @override
   Future<AgentTaskResult> run(AgentTaskRequest request) async {
     requests.add(request);
+    final sessionId = request.conversation?.sessionId ?? _nextSessionId();
     return AgentTaskResult(
-      sessionId: request.conversation?.sessionId ?? 'test-session-1',
+      sessionId: sessionId,
       output: 'Fake result for ${request.title}',
       error: error,
       exitCode: exitCode,
       rawOutput: '{}',
     );
+  }
+
+  String _nextSessionId() {
+    _sessionCount += 1;
+    return 'test-session-$_sessionCount';
   }
 }
 

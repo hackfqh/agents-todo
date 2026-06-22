@@ -291,9 +291,17 @@ extension TodoPriorityDetails on TodoPriority {
 
   String get label {
     return switch (this) {
-      TodoPriority.high => 'High',
-      TodoPriority.medium => 'Medium',
-      TodoPriority.low => 'Low',
+      TodoPriority.high => '高',
+      TodoPriority.medium => '中',
+      TodoPriority.low => '低',
+    };
+  }
+
+  String get fullLabel {
+    return switch (this) {
+      TodoPriority.high => '高优先级',
+      TodoPriority.medium => '中优先级',
+      TodoPriority.low => '低优先级',
     };
   }
 
@@ -1140,8 +1148,6 @@ class TodoHomePage extends StatefulWidget {
 }
 
 class _TodoHomePageState extends State<TodoHomePage> {
-  final TextEditingController _controller = TextEditingController();
-  final FocusNode _inputFocusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
   final ScrollController _sidebarScrollController = ScrollController();
   final ScrollController _agentScrollController = ScrollController();
@@ -1170,8 +1176,6 @@ class _TodoHomePageState extends State<TodoHomePage> {
 
   @override
   void dispose() {
-    _controller.dispose();
-    _inputFocusNode.dispose();
     _scrollController.dispose();
     _sidebarScrollController.dispose();
     _agentScrollController.dispose();
@@ -1229,30 +1233,69 @@ class _TodoHomePageState extends State<TodoHomePage> {
     }
   }
 
-  void _addTodo() {
-    final title = _controller.text.trim();
-    if (title.isEmpty || _selectedProject == null) {
+  Future<void> _addTodo() async {
+    if (_selectedProject == null) {
+      _showAddTodoFeedback('请选择项目后再添加任务。');
       return;
     }
 
-    _insertTodo(
-      _createTodo(title: title, details: '', priority: _quickAddPriority),
+    final draft = await showDialog<_TodoDraft>(
+      context: context,
+      builder: (context) => _AddTodoDialog(
+        initialPriority: _quickAddPriority,
+        initialDate: _today(),
+      ),
     );
-    _controller.clear();
-    _inputFocusNode.requestFocus();
+    if (draft == null) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    _insertTodo(
+      _createTodo(
+        title: draft.title,
+        details: draft.details,
+        priority: draft.priority,
+        createdAt: draft.date,
+      ),
+    );
+    setState(() {
+      _quickAddPriority = draft.priority;
+    });
+  }
+
+  void _showAddTodoFeedback(String message) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(duration: const Duration(seconds: 2), content: Text(message)),
+    );
   }
 
   TodoItem _createTodo({
     required String title,
     required String details,
     TodoPriority priority = TodoPriority.medium,
+    DateTime? createdAt,
   }) {
     final now = DateTime.now();
+    final createdDate = createdAt == null
+        ? now
+        : DateTime(
+            createdAt.year,
+            createdAt.month,
+            createdAt.day,
+            now.hour,
+            now.minute,
+            now.second,
+            now.millisecond,
+            now.microsecond,
+          );
     return TodoItem(
       id: now.microsecondsSinceEpoch.toString(),
       title: title,
       details: details,
-      createdAt: now,
+      createdAt: createdDate,
       priority: priority,
       completed: false,
       conversations: {},
@@ -1790,9 +1833,10 @@ class _TodoHomePageState extends State<TodoHomePage> {
             return Column(
               children: [
                 _TitleBar(
-                  projectName: selectedProject?.name,
+                  canAddTodo: !_isLoading && selectedProject != null,
                   openCount: totalOpen,
                   doneCount: totalDone,
+                  onAddTodo: _addTodo,
                   themeMode: Theme.of(context).brightness,
                   onToggleTheme: widget.onThemeToggle,
                   onOpenSettings: _isLoading ? null : _openSettings,
@@ -1842,15 +1886,6 @@ class _TodoHomePageState extends State<TodoHomePage> {
                           visibleTodos: visibleTodos,
                           selectedTodoId: _selectedTodoId,
                           scrollController: _scrollController,
-                          onAddTodo: _addTodo,
-                          addController: _controller,
-                          addFocusNode: _inputFocusNode,
-                          selectedPriority: _quickAddPriority,
-                          onQuickAddPriorityChanged: (priority) {
-                            setState(() {
-                              _quickAddPriority = priority;
-                            });
-                          },
                           onFilterChanged: (filter) {
                             setState(() {
                               _filter = filter;
@@ -1863,6 +1898,12 @@ class _TodoHomePageState extends State<TodoHomePage> {
                           onSelectTodo: (todo) {
                             setState(() {
                               _selectedTodoId = todo.id;
+                            });
+                          },
+                          onSelectConversation: (todo, agent) {
+                            setState(() {
+                              _selectedTodoId = todo.id;
+                              _selectedAgent = agent;
                             });
                           },
                           onToggleTodo: _toggleTodo,
@@ -2034,6 +2075,7 @@ class _TodoPrioritySection extends StatelessWidget {
     required this.todos,
     required this.selectedTodoId,
     required this.onSelectTodo,
+    required this.onSelectConversation,
     required this.onToggleTodo,
     required this.onPriorityChanged,
     required this.onEditTodo,
@@ -2044,6 +2086,7 @@ class _TodoPrioritySection extends StatelessWidget {
   final List<TodoItem> todos;
   final String? selectedTodoId;
   final ValueChanged<TodoItem> onSelectTodo;
+  final void Function(TodoItem todo, AgentKind agent) onSelectConversation;
   final void Function(TodoItem todo, bool? completed) onToggleTodo;
   final void Function(TodoItem todo, TodoPriority priority) onPriorityChanged;
   final ValueChanged<TodoItem> onEditTodo;
@@ -2100,7 +2143,7 @@ class _TodoPrioritySection extends StatelessWidget {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        '${priority.label} priority',
+                        priority.fullLabel,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.labelSmall?.copyWith(
@@ -2131,6 +2174,7 @@ class _TodoPrioritySection extends StatelessWidget {
                     todo: todo,
                     isSelected: todo.id == selectedTodoId,
                     onSelectTodo: onSelectTodo,
+                    onSelectConversation: onSelectConversation,
                     onToggleTodo: onToggleTodo,
                     onEditTodo: onEditTodo,
                     onDeleteTodo: onDeleteTodo,
@@ -2150,6 +2194,7 @@ class _TodoTile extends StatefulWidget {
     required this.todo,
     required this.isSelected,
     required this.onSelectTodo,
+    required this.onSelectConversation,
     required this.onToggleTodo,
     required this.onEditTodo,
     required this.onDeleteTodo,
@@ -2158,6 +2203,7 @@ class _TodoTile extends StatefulWidget {
   final TodoItem todo;
   final bool isSelected;
   final ValueChanged<TodoItem> onSelectTodo;
+  final void Function(TodoItem todo, AgentKind agent) onSelectConversation;
   final void Function(TodoItem todo, bool? completed) onToggleTodo;
   final ValueChanged<TodoItem> onEditTodo;
   final ValueChanged<TodoItem> onDeleteTodo;
@@ -2301,18 +2347,15 @@ class _TodoTileState extends State<_TodoTile> {
                               ),
                               for (final conversation
                                   in widget.todo.conversations.values)
-                                _InlineChip(
-                                  label: conversation.sessionId.trim().isEmpty
-                                      ? conversation.agent.label
-                                      : conversation.sessionId,
-                                  backgroundColor: colorScheme.primaryContainer
-                                      .withValues(alpha: 0.28),
-                                  foregroundColor: colorScheme.primary,
-                                  borderColor: colorScheme.primary.withValues(
-                                    alpha: 0.24,
-                                  ),
-                                  fontSize: 9,
-                                  fontFamily: 'monospace',
+                                _AgentSessionChip(
+                                  conversation: conversation,
+                                  onPressed:
+                                      conversation.sessionId.trim().isEmpty
+                                      ? null
+                                      : () => widget.onSelectConversation(
+                                          widget.todo,
+                                          conversation.agent,
+                                        ),
                                 ),
                             ],
                           ),
@@ -2424,18 +2467,20 @@ class _TodoDragPreview extends StatelessWidget {
 
 class _TitleBar extends StatelessWidget {
   const _TitleBar({
-    required this.projectName,
+    required this.canAddTodo,
     required this.openCount,
     required this.doneCount,
+    required this.onAddTodo,
     required this.themeMode,
     required this.onToggleTheme,
     required this.onOpenSettings,
     required this.onOpenIssue,
   });
 
-  final String? projectName;
+  final bool canAddTodo;
   final int openCount;
   final int doneCount;
+  final Future<void> Function() onAddTodo;
   final Brightness themeMode;
   final VoidCallback onToggleTheme;
   final VoidCallback? onOpenSettings;
@@ -2455,39 +2500,12 @@ class _TitleBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         children: [
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            child: Row(
-              children: const [
-                _WindowDot(color: Color(0xFFFF5F57)),
-                SizedBox(width: 5),
-                _WindowDot(color: Color(0xFFFFBD2E)),
-                SizedBox(width: 5),
-                _WindowDot(color: Color(0xFF28CA41)),
-              ],
-            ),
+          FilledButton.icon(
+            key: const ValueKey('quick-add-button'),
+            onPressed: canAddTodo ? () => unawaited(onAddTodo()) : null,
+            icon: const Icon(Icons.add_rounded, size: 13),
+            label: const Text('添加待办'),
           ),
-          Text(
-            'Todo Desk',
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          if (projectName != null) ...[
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                '— $projectName',
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontSize: 11,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          ],
           const Spacer(),
           _HeaderStat(
             label: 'Open',
@@ -2525,21 +2543,6 @@ class _TitleBar extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _WindowDot extends StatelessWidget {
-  const _WindowDot({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 11,
-      height: 11,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
     );
   }
 }
@@ -2643,6 +2646,84 @@ class _InlineChip extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AgentSessionChip extends StatelessWidget {
+  const _AgentSessionChip({
+    required this.conversation,
+    required this.onPressed,
+  });
+
+  final AgentConversation conversation;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final sessionId = conversation.sessionId.trim();
+    final label = sessionId.isEmpty
+        ? '${conversation.agent.label} · No session'
+        : '${conversation.agent.label} · $sessionId';
+
+    return Tooltip(
+      message: label,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 260),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onPressed,
+            borderRadius: BorderRadius.circular(4),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: onPressed == null
+                    ? colorScheme.surfaceContainerHighest.withValues(
+                        alpha: 0.36,
+                      )
+                    : colorScheme.primaryContainer.withValues(alpha: 0.28),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: onPressed == null
+                      ? colorScheme.outlineVariant
+                      : colorScheme.primary.withValues(alpha: 0.24),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.forum_outlined,
+                    size: 9,
+                    color: onPressed == null
+                        ? colorScheme.onSurfaceVariant
+                        : colorScheme.primary,
+                  ),
+                  const SizedBox(width: 3),
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w500,
+                        color: onPressed == null
+                            ? colorScheme.onSurfaceVariant
+                            : colorScheme.primary,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -3098,16 +3179,12 @@ class _MainWorkspace extends StatelessWidget {
     required this.visibleTodos,
     required this.selectedTodoId,
     required this.scrollController,
-    required this.onAddTodo,
-    required this.addController,
-    required this.addFocusNode,
-    required this.selectedPriority,
-    required this.onQuickAddPriorityChanged,
     required this.onFilterChanged,
     required this.onDateModeChanged,
     required this.onPickSingleDate,
     required this.onPickDateRange,
     required this.onSelectTodo,
+    required this.onSelectConversation,
     required this.onToggleTodo,
     required this.onPriorityChanged,
     required this.onEditTodo,
@@ -3124,16 +3201,12 @@ class _MainWorkspace extends StatelessWidget {
   final List<TodoItem> visibleTodos;
   final String? selectedTodoId;
   final ScrollController scrollController;
-  final VoidCallback onAddTodo;
-  final TextEditingController addController;
-  final FocusNode addFocusNode;
-  final TodoPriority selectedPriority;
-  final ValueChanged<TodoPriority> onQuickAddPriorityChanged;
   final ValueChanged<TodoFilter> onFilterChanged;
   final ValueChanged<DateFilterMode> onDateModeChanged;
   final VoidCallback onPickSingleDate;
   final VoidCallback onPickDateRange;
   final ValueChanged<TodoItem> onSelectTodo;
+  final void Function(TodoItem todo, AgentKind agent) onSelectConversation;
   final void Function(TodoItem todo, bool? completed) onToggleTodo;
   final void Function(TodoItem todo, TodoPriority priority) onPriorityChanged;
   final ValueChanged<TodoItem> onEditTodo;
@@ -3149,18 +3222,11 @@ class _MainWorkspace extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _WorkspaceToolbar(
-            project: project,
             dateFilterMode: dateFilterMode,
             selectedDate: selectedDate,
             rangeStart: rangeStart,
             rangeEnd: rangeEnd,
             filter: filter,
-            isLoading: isLoading,
-            addController: addController,
-            addFocusNode: addFocusNode,
-            selectedPriority: selectedPriority,
-            onAddTodo: onAddTodo,
-            onQuickAddPriorityChanged: onQuickAddPriorityChanged,
             onFilterChanged: onFilterChanged,
             onDateModeChanged: onDateModeChanged,
             onPickSingleDate: onPickSingleDate,
@@ -3196,6 +3262,7 @@ class _MainWorkspace extends StatelessWidget {
                                 .toList(),
                             selectedTodoId: selectedTodoId,
                             onSelectTodo: onSelectTodo,
+                            onSelectConversation: onSelectConversation,
                             onToggleTodo: onToggleTodo,
                             onPriorityChanged: onPriorityChanged,
                             onEditTodo: onEditTodo,
@@ -3231,36 +3298,22 @@ String _dateLabelFromMode(
 
 class _WorkspaceToolbar extends StatelessWidget {
   const _WorkspaceToolbar({
-    required this.project,
     required this.dateFilterMode,
     required this.selectedDate,
     required this.rangeStart,
     required this.rangeEnd,
     required this.filter,
-    required this.isLoading,
-    required this.addController,
-    required this.addFocusNode,
-    required this.selectedPriority,
-    required this.onAddTodo,
-    required this.onQuickAddPriorityChanged,
     required this.onFilterChanged,
     required this.onDateModeChanged,
     required this.onPickSingleDate,
     required this.onPickDateRange,
   });
 
-  final TodoProject? project;
   final DateFilterMode dateFilterMode;
   final DateTime selectedDate;
   final DateTime rangeStart;
   final DateTime rangeEnd;
   final TodoFilter filter;
-  final bool isLoading;
-  final TextEditingController addController;
-  final FocusNode addFocusNode;
-  final TodoPriority selectedPriority;
-  final VoidCallback onAddTodo;
-  final ValueChanged<TodoPriority> onQuickAddPriorityChanged;
   final ValueChanged<TodoFilter> onFilterChanged;
   final ValueChanged<DateFilterMode> onDateModeChanged;
   final VoidCallback onPickSingleDate;
@@ -3269,62 +3322,6 @@ class _WorkspaceToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final canAdd = !isLoading && project != null;
-    final quickAdd = ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 300, minWidth: 300),
-      child: Row(
-        children: [
-          Expanded(
-            child: Semantics(
-              textField: true,
-              label: 'New task',
-              child: TextField(
-                controller: addController,
-                focusNode: addFocusNode,
-                enabled: canAdd,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => onAddTodo(),
-                decoration: const InputDecoration(
-                  hintText: '新增任务，按 Enter 确认...',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          SizedBox(
-            width: 90,
-            child: DropdownButtonFormField<TodoPriority>(
-              initialValue: selectedPriority,
-              isExpanded: true,
-              items: TodoPriority.values
-                  .map(
-                    (priority) => DropdownMenuItem<TodoPriority>(
-                      value: priority,
-                      child: Text(priority.label),
-                    ),
-                  )
-                  .toList(),
-              onChanged: canAdd
-                  ? (priority) {
-                      if (priority != null) {
-                        onQuickAddPriorityChanged(priority);
-                      }
-                    }
-                  : null,
-              decoration: const InputDecoration(border: OutlineInputBorder()),
-            ),
-          ),
-          const SizedBox(width: 6),
-          FilledButton.icon(
-            onPressed: canAdd ? onAddTodo : null,
-            icon: const Icon(Icons.add_rounded, size: 11),
-            label: const Text('添加'),
-          ),
-        ],
-      ),
-    );
-
     final filters = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -3376,14 +3373,12 @@ class _WorkspaceToolbar extends StatelessWidget {
               spacing: 10,
               runSpacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,
-              children: [quickAdd, filters],
+              children: [filters],
             );
           }
 
           return Row(
             children: [
-              quickAdd,
-              const _ToolbarDivider(),
               Flexible(
                 child: Align(
                   alignment: Alignment.centerLeft,
@@ -3401,6 +3396,9 @@ class _WorkspaceToolbar extends StatelessWidget {
     );
   }
 }
+
+const _defaultAgentInstruction =
+    'Please handle this todo and report the result.';
 
 class _AgentWorkspace extends StatefulWidget {
   const _AgentWorkspace({
@@ -3430,9 +3428,10 @@ class _AgentWorkspace extends StatefulWidget {
 
 class _AgentWorkspaceState extends State<_AgentWorkspace> {
   final TextEditingController _instructionController = TextEditingController(
-    text: 'Please handle this todo and report the result.',
+    text: _defaultAgentInstruction,
   );
   final TextEditingController _sessionController = TextEditingController();
+  bool _startNewSessionOnNextRun = false;
 
   @override
   void initState() {
@@ -3443,9 +3442,21 @@ class _AgentWorkspaceState extends State<_AgentWorkspace> {
   @override
   void didUpdateWidget(covariant _AgentWorkspace oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.todo?.id != widget.todo?.id ||
-        oldWidget.selectedAgent != widget.selectedAgent) {
+    final switchedConversationContext =
+        oldWidget.todo?.id != widget.todo?.id ||
+        oldWidget.selectedAgent != widget.selectedAgent;
+    final historyChanged =
+        switchedConversationContext || _historyChanged(oldWidget);
+
+    if (switchedConversationContext) {
+      _startNewSessionOnNextRun = false;
       _syncSessionController();
+      _resetInstructionController();
+    } else if (historyChanged) {
+      _syncSessionController();
+    }
+    if (historyChanged) {
+      _scrollHistoryToTop(jump: switchedConversationContext);
     }
   }
 
@@ -3462,6 +3473,55 @@ class _AgentWorkspaceState extends State<_AgentWorkspace> {
     if (_sessionController.text != sessionId) {
       _sessionController.text = sessionId;
     }
+  }
+
+  void _resetInstructionController() {
+    if (_instructionController.text != _defaultAgentInstruction) {
+      _instructionController.text = _defaultAgentInstruction;
+    }
+  }
+
+  bool _historyChanged(_AgentWorkspace oldWidget) {
+    final oldConversation =
+        oldWidget.todo?.conversations[oldWidget.selectedAgent];
+    final newConversation = widget.todo?.conversations[widget.selectedAgent];
+    return oldConversation?.sessionId != newConversation?.sessionId ||
+        oldConversation?.updatedAt != newConversation?.updatedAt ||
+        (oldConversation?.runs.length ?? 0) !=
+            (newConversation?.runs.length ?? 0);
+  }
+
+  void _scrollHistoryToTop({required bool jump}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !widget.scrollController.hasClients) {
+        return;
+      }
+      final top = widget.scrollController.position.minScrollExtent;
+      if (jump) {
+        widget.scrollController.jumpTo(top);
+        return;
+      }
+      unawaited(
+        widget.scrollController.animateTo(
+          top,
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+        ),
+      );
+    });
+  }
+
+  Future<void> _runAgent() async {
+    final onRun = widget.onRun;
+    if (onRun == null) {
+      return;
+    }
+    final conversation = widget.todo?.conversations[widget.selectedAgent];
+    final continueSession = !_startNewSessionOnNextRun && conversation != null;
+    final instruction = _instructionController.text;
+    _instructionController.clear();
+    _startNewSessionOnNextRun = false;
+    await onRun(instruction, continueSession: continueSession);
   }
 
   @override
@@ -3633,7 +3693,9 @@ class _AgentWorkspaceState extends State<_AgentWorkspace> {
                       onPressed: isRunning
                           ? null
                           : () {
+                              _startNewSessionOnNextRun = true;
                               _sessionController.clear();
+                              _resetInstructionController();
                             },
                       child: const Text('新会话'),
                     ),
@@ -3644,12 +3706,7 @@ class _AgentWorkspaceState extends State<_AgentWorkspace> {
                   children: [
                     Expanded(
                       child: FilledButton.icon(
-                        onPressed: canRun
-                            ? () => widget.onRun!(
-                                _instructionController.text,
-                                continueSession: false,
-                              )
-                            : null,
+                        onPressed: canRun ? _runAgent : null,
                         icon: const Icon(Icons.send_outlined, size: 12),
                         label: const Text('Send to agent'),
                       ),
@@ -3657,12 +3714,7 @@ class _AgentWorkspaceState extends State<_AgentWorkspace> {
                     const SizedBox(width: 6),
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: canContinue
-                            ? () => widget.onRun!(
-                                _instructionController.text,
-                                continueSession: true,
-                              )
-                            : null,
+                        onPressed: canContinue ? _runAgent : null,
                         icon: const Icon(Icons.rotate_left_outlined, size: 12),
                         label: const Text('Continue'),
                       ),
@@ -3780,6 +3832,7 @@ class _AgentRunCard extends StatelessWidget {
     final output = run.error?.trim().isNotEmpty == true
         ? run.error!.trim()
         : run.output.trim();
+    final instruction = run.instruction.trim();
     final sessionLabel = sessionId.trim().isEmpty ? 'No session' : sessionId;
 
     return Container(
@@ -3855,25 +3908,93 @@ class _AgentRunCard extends StatelessWidget {
               ),
             ],
           ),
-          if (run.instruction.trim().isNotEmpty) ...[
-            const SizedBox(height: 3),
-            Text(
-              run.instruction.trim(),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-                fontSize: 10,
+          if (instruction.isNotEmpty) ...[
+            const SizedBox(height: 7),
+            _AgentHistoryMessage(
+              speaker: '你',
+              body: instruction,
+              backgroundColor: colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.36,
               ),
+              borderColor: colorScheme.outlineVariant,
+              speakerColor: colorScheme.onSurfaceVariant,
+              bodyColor: colorScheme.onSurface,
             ),
           ],
           if (output.isNotEmpty) ...[
-            const SizedBox(height: 5),
-            SelectableText(
-              output,
-              style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
+            const SizedBox(height: 6),
+            _AgentHistoryMessage(
+              speaker: agent.label,
+              body: output,
+              backgroundColor: run.succeeded
+                  ? colorScheme.primaryContainer.withValues(alpha: 0.16)
+                  : colorScheme.errorContainer.withValues(alpha: 0.34),
+              borderColor: run.succeeded
+                  ? colorScheme.primary.withValues(alpha: 0.2)
+                  : colorScheme.error.withValues(alpha: 0.28),
+              speakerColor: run.succeeded
+                  ? colorScheme.primary
+                  : colorScheme.error,
+              bodyColor: colorScheme.onSurface,
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AgentHistoryMessage extends StatelessWidget {
+  const _AgentHistoryMessage({
+    required this.speaker,
+    required this.body,
+    required this.backgroundColor,
+    required this.borderColor,
+    required this.speakerColor,
+    required this.bodyColor,
+  });
+
+  final String speaker;
+  final String body;
+  final Color backgroundColor;
+  final Color borderColor;
+  final Color speakerColor;
+  final Color bodyColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        border: Border.all(color: borderColor),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            speaker,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: speakerColor,
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 3),
+          SelectableText(
+            body,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: bodyColor,
+              fontSize: 10,
+              height: 1.35,
+            ),
+          ),
         ],
       ),
     );
@@ -4252,6 +4373,215 @@ class _ProjectDraft {
 
   final String name;
   final String folderPath;
+}
+
+class _TodoDraft {
+  const _TodoDraft({
+    required this.title,
+    required this.details,
+    required this.priority,
+    required this.date,
+  });
+
+  final String title;
+  final String details;
+  final TodoPriority priority;
+  final DateTime date;
+}
+
+class _AddTodoDialog extends StatefulWidget {
+  const _AddTodoDialog({
+    required this.initialPriority,
+    required this.initialDate,
+  });
+
+  final TodoPriority initialPriority;
+  final DateTime initialDate;
+
+  @override
+  State<_AddTodoDialog> createState() => _AddTodoDialogState();
+}
+
+class _AddTodoDialogState extends State<_AddTodoDialog> {
+  late final TextEditingController _titleController;
+  late final TextEditingController _detailsController;
+  final FocusNode _titleFocusNode = FocusNode();
+  late TodoPriority _priority;
+  late DateTime _date;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController();
+    _detailsController = TextEditingController();
+    _priority = widget.initialPriority;
+    _date = _dateOnly(widget.initialDate);
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _detailsController.dispose();
+    _titleFocusNode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100, 12, 31),
+    );
+    if (picked == null || !mounted) {
+      return;
+    }
+    setState(() {
+      _date = _dateOnly(picked);
+    });
+  }
+
+  void _save() {
+    final title = _titleController.text.trim();
+    if (title.isEmpty) {
+      setState(() {
+        _error = '请输入待办名称。';
+      });
+      _titleFocusNode.requestFocus();
+      return;
+    }
+
+    Navigator.of(context).pop(
+      _TodoDraft(
+        title: title,
+        details: _detailsController.text.trim(),
+        priority: _priority,
+        date: _date,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return AlertDialog(
+      title: const Text('新增待办'),
+      content: SizedBox(
+        width: 460,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _titleController,
+              focusNode: _titleFocusNode,
+              autofocus: true,
+              textInputAction: TextInputAction.done,
+              decoration: InputDecoration(
+                labelText: '待办名称',
+                prefixIcon: const Icon(Icons.edit_note_outlined),
+                border: const OutlineInputBorder(),
+                errorText: _error,
+              ),
+              onChanged: (_) {
+                if (_error != null) {
+                  setState(() {
+                    _error = null;
+                  });
+                }
+              },
+              onSubmitted: (_) => _save(),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _detailsController,
+              minLines: 3,
+              maxLines: 5,
+              textInputAction: TextInputAction.newline,
+              decoration: const InputDecoration(
+                labelText: '待办详情（选填）',
+                alignLabelWithHint: true,
+                prefixIcon: Icon(Icons.notes_outlined),
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 14),
+            DropdownButtonFormField<TodoPriority>(
+              initialValue: _priority,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: '等级',
+                prefixIcon: Icon(Icons.flag_outlined),
+                border: OutlineInputBorder(),
+              ),
+              items: TodoPriority.values
+                  .map(
+                    (priority) => DropdownMenuItem<TodoPriority>(
+                      value: priority,
+                      child: Row(
+                        children: [
+                          Icon(
+                            priority.icon,
+                            size: 14,
+                            color: priority.color(colorScheme),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(priority.fullLabel),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (priority) {
+                if (priority == null) {
+                  return;
+                }
+                setState(() {
+                  _priority = priority;
+                });
+              },
+            ),
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              key: const ValueKey('todo-date-button'),
+              onPressed: _pickDate,
+              icon: const Icon(Icons.calendar_month_outlined),
+              label: Text('日期：${_formatDate(_date)}'),
+              style: OutlinedButton.styleFrom(
+                alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 10,
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '用于待办列表展示和日期筛选。',
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 11,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton.icon(
+          onPressed: _save,
+          icon: const Icon(Icons.add_task_outlined),
+          label: const Text('创建待办'),
+        ),
+      ],
+    );
+  }
 }
 
 class _ProjectDialog extends StatefulWidget {

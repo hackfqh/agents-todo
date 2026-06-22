@@ -26,4 +26,27 @@ void main() {
     );
     expect(prompt, isNot(contains('return a concise result')));
   });
+
+  test('extracts session ids from agent JSON output', () {
+    expect(
+      extractSessionIdFromOutput('{"session_id":"session_123"}'),
+      'session_123',
+    );
+  });
+
+  test('extracts Codex thread ids from agent JSON output', () {
+    const rawOutput = '''
+{"type":"thread/started","thread_id":"thread_direct_123"}
+{"type":"message","message":"done"}
+''';
+
+    expect(extractSessionIdFromOutput(rawOutput), 'thread_direct_123');
+  });
+
+  test('extracts nested Codex thread ids from agent JSON output', () {
+    const rawOutput =
+        '{"method":"thread/started","params":{"thread":{"id":"thread_nested_123"}}}';
+
+    expect(extractSessionIdFromOutput(rawOutput), 'thread_nested_123');
+  });
 }

@@ -226,7 +226,8 @@ class CliAgentTaskRunner implements AgentTaskRunner {
     final output = outputFromFile.isNotEmpty
         ? outputFromFile
         : _extractOutput(processResult.stdout).trim();
-    final parsedSessionId = _extractSessionId(rawOutput) ?? existingSessionId;
+    final parsedSessionId =
+        extractSessionIdFromOutput(rawOutput) ?? existingSessionId;
 
     return AgentTaskResult(
       sessionId: parsedSessionId,
@@ -261,7 +262,7 @@ class CliAgentTaskRunner implements AgentTaskRunner {
     );
     final rawOutput = '${processResult.stdout}\n${processResult.stderr}'.trim();
     final parsedSessionId =
-        _extractSessionId(rawOutput) ?? existingSessionId ?? sessionId;
+        extractSessionIdFromOutput(rawOutput) ?? existingSessionId ?? sessionId;
     final output = _extractOutput(processResult.stdout).trim();
 
     return AgentTaskResult(
@@ -298,7 +299,7 @@ class CliAgentTaskRunner implements AgentTaskRunner {
     );
     final rawOutput = '${processResult.stdout}\n${processResult.stderr}'.trim();
     final parsedSessionId =
-        _extractSessionId(rawOutput) ?? existingSessionId ?? sessionId;
+        extractSessionIdFromOutput(rawOutput) ?? existingSessionId ?? sessionId;
     final output = _extractOutput(processResult.stdout).trim();
 
     return AgentTaskResult(
@@ -518,7 +519,7 @@ String? _extractTextFromJson(Object? value) {
   return null;
 }
 
-String? _extractSessionId(String rawOutput) {
+String? extractSessionIdFromOutput(String rawOutput) {
   final trimmed = rawOutput.trim();
   if (trimmed.isEmpty) {
     return null;
@@ -552,10 +553,16 @@ String? _extractSessionId(String rawOutput) {
   return uuidMatch?.group(0);
 }
 
-String? _extractSessionIdFromJson(Object? value) {
+String? _extractSessionIdFromJson(
+  Object? value, {
+  bool isConversationContext = false,
+}) {
   if (value is List) {
     for (final item in value) {
-      final sessionId = _extractSessionIdFromJson(item);
+      final sessionId = _extractSessionIdFromJson(
+        item,
+        isConversationContext: isConversationContext,
+      );
       if (sessionId != null) {
         return sessionId;
       }
@@ -566,20 +573,35 @@ String? _extractSessionIdFromJson(Object? value) {
       final key = entry.key.toString().toLowerCase();
       final entryValue = entry.value;
       if (entryValue is String &&
-          key.contains('session') &&
-          key.contains('id') &&
+          (_isConversationIdKey(key) ||
+              (isConversationContext && key == 'id')) &&
           entryValue.trim().isNotEmpty) {
         return entryValue.trim();
       }
     }
     for (final entry in value.entries) {
-      final sessionId = _extractSessionIdFromJson(entry.value);
+      final key = entry.key.toString().toLowerCase();
+      final sessionId = _extractSessionIdFromJson(
+        entry.value,
+        isConversationContext:
+            isConversationContext || _isConversationContextKey(key),
+      );
       if (sessionId != null) {
         return sessionId;
       }
     }
   }
   return null;
+}
+
+bool _isConversationIdKey(String key) {
+  return _isConversationContextKey(key) && key.contains('id');
+}
+
+bool _isConversationContextKey(String key) {
+  return key.contains('session') ||
+      key.contains('thread') ||
+      key.contains('conversation');
 }
 
 DateTime? _readDateTime(Object? value) {
